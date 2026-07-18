@@ -68,6 +68,8 @@ The plugin + harness above is the complete, self-contained core — everything y
 
 ## Docs
 
+**Start with [`docs/README.md`](docs/README.md)** — a reading guide with suggested order depending on whether you're evaluating, adopting, or operating the system. The full set:
+
 - `docs/overview.md` — how the pieces wire together, with a diagram
 - `docs/skills.md` — per-skill reference
 - `docs/agents.md` — per-agent reference (plugin personas + harness workers)
