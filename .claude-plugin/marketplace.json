@@ -1,0 +1,10 @@
+{
+  "name": "lean-flow",
+  "owner": { "name": "ajanatka" },
+  "plugins": [
+    {
+      "name": "lean-flow",
+      "source": "./plugins/lean-flow"
+    }
+  ]
+}

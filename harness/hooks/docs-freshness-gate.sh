@@ -1,0 +1,54 @@
+#!/bin/bash
+# Stop hook: docs-freshness gate. If this session merged PR(s) but never ran
+# the documentation pass (docs-writer agent) or edited the documented surfaces,
+# block the stop ONCE with instructions. Sits right after lf-learn in the
+# close-out queue: lf-learn captures the learning (docs/solutions/), this
+# captures the *reference + human-facing docs* a future agent/dev/stakeholder
+# reads. There is no silent skip: either run the docs pass (dispatched to the
+# docs-writer agent — NEVER authored inline by the orchestrator model), or
+# state explicitly that the merged change needs no doc update / the repo
+# owner approved skip.
+# Loop-safe: stop_hook_active + a per-session marker → at most one block.
+#
+# Independent of the learning gate on purpose: a change can need a
+# feature-reference/manual update without carrying a docs/solutions learning
+# (e.g. a new flag), so docs-activation is NOT coupled to learning evidence.
+# Ordering ("after lf-learn") comes from array order in settings.json.
+
+set -u
+
+# Fleet guard: headless fleet agents (LF_FLEET_AGENT set) skip interactive-only hooks
+if [ -n "${LF_FLEET_AGENT:-}" ]; then exit 0; fi
+
+input=$(cat)
+
+session_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))' <<<"$input" 2>/dev/null)
+tp=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("transcript_path",""))' <<<"$input" 2>/dev/null)
+active=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("stop_hook_active",False))' <<<"$input" 2>/dev/null)
+
+[ "$active" = "True" ] && exit 0          # already continuing from a stop hook
+[ -n "$session_id" ] && [ -f "$tp" ] || exit 0
+
+DIR="$HOME/.claude/state/docs-gate"
+mkdir -p "$DIR"
+marker="$DIR/$session_id"
+[ -f "$marker" ] && exit 0                # already gated once this session
+
+# Merge evidence: actual gh pr merge commands issued by this session
+# (tool_input command strings), not mere mentions in context.
+# NB: grep -c prints the count even when it exits 1 (zero matches) — never
+# append `|| echo 0`, it double-prints and breaks -eq.
+merges=$(grep -c '"command":[^,}]*gh pr merge' "$tp" 2>/dev/null)
+merges=${merges:-0}
+[ "$merges" -eq 0 ] && exit 0
+
+# Docs evidence: docs-writer agent invocation, or an edit/write to any
+# documented surface (a hosted manual, if the repo has one, or the
+# agent-facing reference docs).
+docs=$(grep -o '"subagent_type":[^,}]*\|"file_path":[^,}]*' "$tp" 2>/dev/null | grep -c 'docs-writer\|docs/manual/\|docs/architecture/\|docs/api/\|feature-reference')
+docs=${docs:-0}
+[ "$docs" -gt 0 ] && exit 0
+
+touch "$marker"
+echo "This session merged PR(s) but the documentation pass never ran. Before stopping: if the merged change altered anything a future agent, developer, or stakeholder would read about, run the docs pass NOW by dispatching the docs-writer agent with a packet: merged PR(s), changed subsystems, feature summary, tracker ref (if any). It updates the agent-facing reference (feature-reference.md, subsystem CLAUDE.md, docs/architecture, docs/api) and, if the repo has a docs/manual or equivalent human-facing docs surface, updates it too — then commits docs-only source under the repo's docs-only policy, and surfaces (but never runs) the repo's documented deploy command for that surface. NEVER author docs inline on the orchestrator model. Only skip if the change needs no doc update (test/chore/trivial) or the repo owner explicitly approved skipping — and say which, explicitly, before stopping." >&2
+exit 2
