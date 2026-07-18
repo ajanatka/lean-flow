@@ -1,7 +1,7 @@
 ---
 name: lf-reliability-reviewer
 description: Reviews code for production reliability and failure modes -- partial failures, retry storms, cascading timeouts, degrade-vs-fall-over behavior. Dispatch when the diff touches error handling, retries, circuit breakers, timeouts, health checks, background jobs, or async handlers.
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 color: blue
 

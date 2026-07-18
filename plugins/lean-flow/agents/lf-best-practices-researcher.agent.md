@@ -1,7 +1,7 @@
 ---
 name: lf-best-practices-researcher
 description: "Researches and synthesizes external best practices, official docs, and real-world examples for a technology or framework into actionable guidance. Dispatch when a task needs industry standards, community conventions, or implementation guidance beyond what the codebase already shows."
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch, mcp__context7__*
 ---
 

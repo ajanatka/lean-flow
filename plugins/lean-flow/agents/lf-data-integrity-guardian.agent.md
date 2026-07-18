@@ -1,7 +1,7 @@
 ---
 name: lf-data-integrity-guardian
 description: "Reviews database migrations, data models, and persistent-data code for reversibility, constraint safety, transaction boundaries, and privacy compliance (GDPR/CCPA). Dispatch when checking migration safety, data constraints, transaction boundaries, or privacy-compliance concerns."
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 

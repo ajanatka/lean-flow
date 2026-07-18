@@ -1,7 +1,7 @@
 ---
 name: lf-security-reviewer
 description: Reviews code for exploitable vulnerabilities by tracing whether an attacker's path through the diff is actually stopped. Dispatch when the diff touches auth middleware, public endpoints, user input handling, or permission checks.
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 color: blue
 

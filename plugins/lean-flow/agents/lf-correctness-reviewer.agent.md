@@ -1,7 +1,7 @@
 ---
 name: lf-correctness-reviewer
 description: Reviews code for logic errors, edge cases, state-management bugs, error-propagation failures, and intent-vs-implementation mismatches. Always-on persona -- dispatch on every code review regardless of diff size or domain.
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 color: blue
 

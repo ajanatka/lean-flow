@@ -1,7 +1,7 @@
 ---
 name: lf-typescript-reviewer
 description: Reviews TypeScript/React/Alpine diffs with a strict bar for type safety, clarity, and maintainability. Dispatch when the diff touches TypeScript code.
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 color: blue
 ---

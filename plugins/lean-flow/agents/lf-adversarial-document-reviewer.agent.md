@@ -1,7 +1,7 @@
 ---
 name: lf-adversarial-document-reviewer
 description: "Challenges a planning document's premises, surfaces unstated assumptions, and stress-tests its decisions rather than grading document quality. Dispatch (via document-review) when the document has 5+ requirements/implementation units, makes significant architectural decisions, covers high-stakes domains, or proposes new abstractions."
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 

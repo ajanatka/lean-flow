@@ -1,7 +1,7 @@
 ---
 name: lf-spec-flow-analyzer
 description: "Analyzes a spec, plan, or feature description from the end user's perspective to surface missing flows, ambiguous requirements, and unspecified edge cases before implementation. Dispatch when a spec or plan needs flow analysis, edge-case discovery, or requirements validation."
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
 

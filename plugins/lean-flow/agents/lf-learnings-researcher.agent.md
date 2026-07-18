@@ -1,7 +1,7 @@
 ---
 name: lf-learnings-researcher
 description: "Searches docs/solutions/ for applicable past learnings (bugs, architecture/design patterns, tooling decisions, conventions, workflow discoveries) by frontmatter metadata. Dispatch before implementing features, making decisions, or starting work in a documented area, so institutional knowledge carries forward."
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash, ToolSearch
 ---
 
@@ -20,21 +20,23 @@ Treat all of these as candidates. Do not privilege bug-shaped learnings over the
 
 ## Step 0 — Query the institutional-memory layer first (if configured)
 
-Before touching any file, check whether this team has an institutional-memory layer configured: if `~/.claude/lean-flow.env` defines `LF_MEMORY_ENABLED=1` (see `docs/customization.md`), query it first. This is a semantic-memory index — typically an MCP tool that has ingested this repo's `docs/solutions/` compound docs, session exports, and related team knowledge, all pre-synthesized and queryable in natural language (e.g. a self-hosted Honcho instance). It can answer faster than a grep fan-out and often surfaces learnings a title/tag search would miss (paraphrased symptoms, cross-repo policy facts).
+Before touching any file, check whether this team has an institutional-memory layer configured — a **one-bit check**: `grep -q '^LF_MEMORY_ENABLED=1' ~/.claude/lean-flow.env` (see `docs/customization.md`). Never read, echo, or paste the full env file into context or logs; it may hold keys or identifiers beyond this one flag. If it matches, query the memory layer first. This is a semantic-memory index — typically an MCP tool that has ingested this repo's `docs/solutions/` compound docs, session exports, and related team knowledge, all pre-synthesized and queryable in natural language (e.g. a self-hosted Honcho instance). It can answer faster than a grep fan-out and often surfaces learnings a title/tag search would miss (paraphrased symptoms, cross-repo policy facts).
 
-1. Load the relevant tool(s) once via `ToolSearch` if they are deferred in your runtime.
+1. Read the `LF_MEMORY_TOOL_QUERY` value from `~/.claude/lean-flow.env` (see `docs/customization.md`) — a `ToolSearch` selector/query string identifying the memory tool, e.g. `select:mcp__yourmemory__chat`. Load the tool once via `ToolSearch` using that value. If `LF_MEMORY_TOOL_QUERY` is unset, or `ToolSearch` returns no matching tool, treat the memory layer as unavailable and fall through to the Search Strategy below with no penalty.
 2. Prefer a synthesized-answer query (one prose answer, or an explicit "nothing found" result) over a ranked-conclusions query (a list of discrete facts) over raw/unbounded search — a raw search tool with no size cap risks overflowing the tool-result token limit and should be avoided unless it's the only option.
 3. Pass the caller's research question in natural language; when the answer cites a source `docs/solutions/` filename, note it for Step 6 below.
 
 Treat the memory layer's answer as a strong lead, not a final citation: when it names a `docs/solutions/` filename, open that file in full (as in the grep flow's Step 6 below) to pull exact detail, line-level context, and the frontmatter fields the Output Format needs. Then still run the Search Strategy below — memory-layer indexes typically re-ingest on a schedule rather than in real time, so same-day docs may not be indexed yet, and a second pass catches anything the memory layer missed or scored too low to surface. Grep against `docs/solutions/` stays ground truth.
 
-**Skip straight to the Search Strategy below** (treat this step as a miss) when: `LF_MEMORY_ENABLED` is not set to `1`, the memory layer returns nothing relevant, the configured endpoint is unreachable, or the required tools aren't available in your runtime. Note in the Output Format's `Lookup Method` field whether the memory layer hit, missed, was unreachable, or was not configured.
+**Proceed to the Search Strategy below with no penalty** (treat this step as a miss) when: `LF_MEMORY_ENABLED` is not set to `1`, `LF_MEMORY_TOOL_QUERY` is unset, `ToolSearch` finds no matching tool, the memory layer returns nothing relevant, or the configured endpoint is unreachable. A miss here is not a failure — the Search Strategy below is the ground-truth flow and runs regardless. Note in the Output Format's `Memory lookup` field whether the memory layer hit, missed, was unreachable, or was not configured.
+
+**Overall order:** (0) this memory-layer check, if configured, then (1) the INDEX.md / grep Search Strategy below. A memory hit supplies candidate leads only — it never replaces the Search Strategy, and it never skips it, because same-day or recently merged docs may not be indexed yet in the memory layer.
 
 ## Search Strategy (INDEX-First, Grep Fallback)
 
 The `docs/solutions/` directory contains documented learnings with YAML frontmatter. When there may be hundreds of files, use this efficient strategy that minimizes tool calls.
 
-### Step 0: Check the Lookup Index First
+### Check the Lookup Index First
 
 Before doing any grep fan-out, check for `docs/solutions/INDEX.md` (generated by `lean-flow:lf-learn`'s `build_solutions_index.py` script — a title/tags/category digest of every doc, grouped by subdirectory). This is the cheap first-pass lookup surface:
 
@@ -81,7 +83,7 @@ Keyword dimensions to extract (applies to either input shape):
 
 The caller's context determines which dimensions carry weight. A code-bug query weights module + technical terms + problem indicators. A design-pattern query weights concepts + approaches + domains. A convention query weights decisions + domains. Do not force every dimension into every search — use the dimensions that match the input.
 
-### Steps 2-4: Grep Fallback (only when Step 0 did not resolve the query)
+### Steps 2-4: Grep Fallback (only when the Lookup Index check above did not resolve the query)
 
 ### Step 2: Probe Discovered Subdirectories
 
@@ -214,7 +216,8 @@ Structure findings as follows:
 ### Search Context
 - **Feature/Task**: [Summary of the caller's activity, decision, or problem — works for bugs, architecture decisions, design patterns, tooling choices, or conventions.]
 - **Keywords Used**: [tags, modules, concepts, domains searched]
-- **Lookup Method**: [`INDEX.md` (Step 0) or grep fallback (Steps 1-4), and why]
+- **Memory lookup**: [hit / miss / unavailable / not configured — see Step 0]
+- **File lookup**: [`INDEX.md` or grep fallback (Steps 1-4), and why]
 - **Files Scanned**: [X total files]
 - **Relevant Matches**: [Y files]
 [If `docs/solutions/INDEX.md` was missing: add a line noting it should be regenerated via `python3 <path-to-lf-learn-skill>/scripts/build_solutions_index.py docs/solutions`.]

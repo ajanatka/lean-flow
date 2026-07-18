@@ -1,7 +1,7 @@
 ---
 name: lf-data-migrations-reviewer
 description: Reviews migration files, schema changes, data transformations, and backfill scripts for data-integrity and deploy-window safety (old code vs new schema, new code vs old data, partial-failure states). Dispatch when the diff touches any of those.
-model: inherit
+model: sonnet
 tools: Read, Grep, Glob, Bash
 color: blue
 
