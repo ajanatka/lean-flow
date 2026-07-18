@@ -387,13 +387,13 @@ Pass the resulting path list to the `project-standards` persona inside a `<stand
 
 #### Model tiering
 
-Three reviewers inherit the session model with no override: `lf-correctness-reviewer`, `lf-security-reviewer`, and `lf-adversarial-reviewer`. These perform the highest-stakes analysis — logic bugs, security vulnerabilities, adversarial failure scenarios — and should run at whatever capability level the user has configured. If the user is on Opus, these get Opus.
+Review execution is always Sonnet. Every persona sub-agent and LF agent -- including `lf-correctness-reviewer`, `lf-security-reviewer`, and `lf-adversarial-reviewer` -- runs on the platform's mid-tier model, regardless of the session's driving model. In Claude Code, pass `model: "sonnet"` in the Agent tool call. On other platforms, use the equivalent mid-tier (e.g., `gpt-5.4-mini` in Codex as of April 2026). If the platform has no model override mechanism or the available model names are unknown, omit the model parameter and let agents inherit the default -- a working review on the parent model is better than a broken dispatch from an unrecognized model name.
 
-All other persona sub-agents and LF agents use the platform's mid-tier model to reduce cost and latency. In Claude Code, pass `model: "sonnet"` in the Agent tool call. On other platforms, use the equivalent mid-tier (e.g., `gpt-5.4-mini` in Codex as of April 2026). If the platform has no model override mechanism or the available model names are unknown, omit the model parameter and let agents inherit the default -- a working review on the parent model is better than a broken dispatch from an unrecognized model name.
+Under a Fable orchestrator this is intentional: Fable's role is orchestration and validation -- intent discovery, reviewer selection, finding merge/dedup, and synthesis -- never review execution itself. No persona sub-agent inherits the Fable (or Opus) session model, even for the highest-stakes personas; capability at the orchestrator layer does not extend to the reviewers it dispatches.
 
-Under a Fable orchestrator this is intentional: correctness/security/adversarial reviewers run at orchestrator capability; the rest are pinned sonnet.
+The orchestrator (this skill) inherits the session model; it handles intent discovery, reviewer selection, finding merge/dedup, and synthesis -- tasks that benefit from the same reasoning capability the user configured.
 
-The orchestrator (this skill) also inherits the session model; it handles intent discovery, reviewer selection, finding merge/dedup, and synthesis -- tasks that benefit from the same reasoning capability the user configured.
+**Hard-trigger escalation (conditional).** When the diff hits a hard trigger -- schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind -- dispatch `lf-correctness-reviewer`, `lf-security-reviewer`, and `lf-adversarial-reviewer` with `model: "opus"` (per-call override; frontmatter stays sonnet). These three perform the analysis where model depth changes findings. All other personas remain sonnet even on hard triggers. On platforms without a per-call override, fall back to the default model rather than failing the dispatch.
 
 #### Run ID
 
