@@ -1,6 +1,6 @@
 # Lean Flow
 
-A Claude Code plugin + harness that packages a planning-heavy, review-gated, self-improving agentic engineering workflow. If you saw a talk about this and want the whole system, this is it: skills for brainstorming and planning, persona agents for adversarial review, hooks that enforce the rules a prompt alone can't, and dispatch-lane agents that keep token spend proportional to how hard the work actually is.
+A Claude Code plugin + harness that packages a planning-heavy, review-gated, self-improving agentic engineering workflow. Skills for brainstorming and planning, persona agents for adversarial review, hooks that enforce the rules a prompt alone can't, and dispatch-lane agents that keep token spend proportional to how hard the work actually is.
 
 ## What Lean Flow is
 
