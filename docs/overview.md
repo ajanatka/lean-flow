@@ -31,7 +31,7 @@ Full behavior and exact wiring: `docs/hooks.md`.
 
 ## Harness agents are the dispatch lanes
 
-An orchestrator model doesn't have to be the one reading every file or writing every line. The harness agents give it named, cost-tiered destinations for different kinds of work — see `docs/orchestration.md` for the full routing logic and the token-economics reasoning behind it.
+An orchestrator model doesn't have to be the one reading every file or writing every line. The harness agents give it named, cost-tiered destinations for different kinds of work — see `docs/orchestration.md` for the full routing logic and the token-economics reasoning behind it, including the decision trees for lane routing and session-driver/review tiering.
 
 ## How a feature flows through the system
 

@@ -63,5 +63,6 @@ Two populations of agents ship with Lean Flow, and they answer different questio
 | `learning-writer` | Sonnet | Authors `docs/solutions/` learning docs by invoking `lf-learn` and taking its recommended choices without asking. All `lf-learn` runs should go through this agent, never inline on the orchestrator model. |
 | `docs-writer` | Sonnet | Session close-out documentation: updates agent/dev-facing reference docs and, if the repo has one, a human-readable manual, then commits docs-only source. Never deploys anything. Stays out of `docs/solutions/` (that's `learning-writer`'s job). |
 | `linear-worker` | Sonnet | Composes and executes issue tracker writes (create/update/reconcile), keyed by `$LF_LINEAR_TEAM_KEY`. Optional — only relevant if you wire in the Linear hooks. See `docs/customization.md`. |
+| `alert-writer` | Sonnet | Designs and wires observability alerting (derived metrics, dashboard charts, chart alerts, heartbeats/monitors — Better Stack or your platform's equivalent) for newly shipped failure signals, at close-out or on demand. Triages first and may report "no alert needed." |
 
 See `docs/orchestration.md` for the routing logic behind when to use each dispatch-lane agent, and `docs/overview.md` for how skills invoke the persona agents above.

@@ -19,6 +19,7 @@ When driving with [your strongest model], formal `lf-brainstorm`/`lf-plan` are n
 - **`learning-writer`**: all `lf-learn` runs go through this agent — never author a learning doc inline.
 - **`docs-writer`**: all close-out documentation passes go through this agent — never authored inline.
 - **`linear-worker`** *(if using Linear — see docs/customization.md to swap trackers)*: all issue-tracker writes go through this agent — never compose issue bodies inline.
+- **`alert-writer`**: observability alerting for newly shipped signals — it triages and may say "no alert needed."
 
 **Model routing never inherits by default.** A bare catch-all/general-purpose subagent dispatched without an explicit model override inherits the orchestrator's own (expensive) tier. Always dispatch through a model-pinned lane or set the model explicitly.
 

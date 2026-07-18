@@ -48,7 +48,7 @@ Together they cover the full loop: brainstorm → plan → implement → review 
 | Plugin skills | 16 skills: the brainstorm → plan → review → commit → learn workflow, plus session-history search and general-purpose process skills (TDD, systematic debugging, worktree isolation) | `docs/skills.md` |
 | Plugin agents | 31 persona agents dispatched by `lf-doc-review` and `lf-code-review` for plan/code review, plus research agents (learnings, repo conventions, best practices, web, session history) | `docs/agents.md` |
 | Harness hooks | 7 core hooks (git hygiene, merge-base safety, model-triage nudge, learning/docs stop-gates) + 5 optional hooks (Linear integration, prod-safety draft) | `docs/hooks.md` |
-| Harness agents | 6 dispatch-lane agents: `scan-worker`, `sonnet-worker`, `advisor`, `learning-writer`, `docs-writer`, `linear-worker` | `docs/agents.md` |
+| Harness agents | 7 dispatch-lane agents: `scan-worker`, `sonnet-worker`, `advisor`, `learning-writer`, `docs-writer`, `linear-worker`, `alert-writer` | `docs/agents.md` |
 
 ## How a feature flows through the system
 
@@ -64,10 +64,10 @@ The plugin + harness above is the complete, self-contained core — everything y
 - `docs/skills.md` — per-skill reference
 - `docs/agents.md` — per-agent reference (plugin personas + harness workers)
 - `docs/hooks.md` — per-hook reference, settings.json wiring, optional-hook config
-- `docs/orchestration.md` — model routing, handoff packets, return contracts, review policy
+- `docs/orchestration.md` — model routing, handoff packets, return contracts, review policy (see the decision trees in docs/orchestration.md)
 - `docs/customization.md` — Linear config, swapping trackers, the learning-doc schema, disabling gates
 - `docs/optimizations.md` — the surrounding toolchain: output filtering, code-graph memory, institutional memory, second-model review
 
 ## License
 
-MIT. Portions derived and customized from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin) — see `LICENSE` and `ATTRIBUTION.md` for the full license text and a description of what was renamed, debranded, genericized, and added.
+MIT. The harness and docs are original to Lean Flow; portions of the plugin's skills and agents were derived and customized from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin) (MIT, (c) 2025 Every) and the [Superpowers](https://github.com/obra/superpowers) skill collection — see `LICENSE` and `ATTRIBUTION.md` for specifics.

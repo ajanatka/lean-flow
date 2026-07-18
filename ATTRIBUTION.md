@@ -1,5 +1,10 @@
 # Attribution
 
-Portions of `plugins/lean-flow/` are derived and customized from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin), licensed under the MIT License (c) 2025 Every. The upstream license text and copyright notice are preserved in full in `LICENSE`.
+Lean Flow — the harness (`harness/`), the documentation (`docs/`), and the overall packaging — is original work, MIT-licensed (c) 2026 Andrew Janatka.
 
-The customization renamed, debranded, genericized, and extended the upstream skills and agents with a harness (`harness/` and the `docs/` in this repo) that is original to Lean Flow and did not exist in the source project.
+Two parts of the plugin were derived and customized from existing open-source projects:
+
+- Most of the workflow skills and reviewer persona agents in `plugins/lean-flow/` were derived and customized (renamed, debranded, genericized) from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin), MIT License, (c) 2025 Every.
+- The three process skills `systematic-debugging`, `test-driven-development`, and `using-git-worktrees` were adapted from the open-source [Superpowers](https://github.com/obra/superpowers) skill collection.
+
+The upstream MIT copyright notice is preserved in `LICENSE`.

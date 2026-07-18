@@ -12,6 +12,33 @@ The core idea: the model driving the session and the model doing the work don't 
 
 The failure mode this prevents: dispatching a bare general-purpose subagent without pinning its model, which silently inherits the orchestrator's (expensive) tier for grunt work. Always dispatch through a model-pinned lane or set the model explicitly.
 
+### Decision tree: which lane does this task go to?
+
+```mermaid
+flowchart TD
+    Start["Task identified"] --> Kind{"What kind of work?"}
+    Kind -->|"Read / scan / log reduction"| Scan["scan-worker (Haiku)"]
+    Kind -->|"Routine implementation\nfrom a bounded brief"| Sonnet["sonnet-worker (Sonnet)\nDEFAULT FLOOR"]
+    Kind -->|"Novel debugging /\nedge-case-dense code"| SonnetOpus["sonnet-worker\nwith model:opus override\n(kept rare)"]
+    Kind -->|"Design / UI"| Design["Strongest model +\na frontend-design skill"]
+    Kind -->|"Issue-tracker writes"| Linear["linear-worker"]
+    Kind -->|"Learning docs"| Learn["learning-writer"]
+    Kind -->|"Reference docs"| Docs["docs-writer"]
+    Kind -->|"Alert authoring"| Alert["alert-writer"]
+    Kind -->|"Tiny fix or\ntightly coupled edit"| Inline["Do it inline\n(coordination costs more\nthan it saves)"]
+```
+
+**When a lane attempt fails:**
+
+```mermaid
+flowchart TD
+    Fail["Lane attempt fails"] --> Retry["1 retry at same tier,\ncarrying the failure evidence"]
+    Retry --> Check{"Still failing?"}
+    Check -->|"Yes"| Up["Escalate ONE tier up\n(never straight to flagship)"]
+    Check -->|"No"| Done["Done at this tier"]
+    Up --> Watch["Watch: escalation rate\n(cheap+expensive = miscalibrated gate)\nand cache affinity\n(don't reroute mid-task)"]
+```
+
 ## Handoff packets
 
 Every dispatched brief is self-contained — the #1 delegation failure mode is a vague brief that forces the worker to guess at intent or re-derive context the orchestrator already had. A handoff packet includes:
@@ -60,6 +87,24 @@ A legitimate deliberate choice for long, mechanical sessions (backfills, bulk fi
 - **Final review**, before calling the work done.
 
 The advisor never implements; it reviews a plan, diff, or decision and returns direction, risks, and course corrections. `advisor` in this repo is exactly that role. This pattern is a poor fit for architecture decisions, incident debugging, or cross-repo contract work — drive those with the strongest model directly rather than leaning on sparse advisor consults.
+
+### Decision tree: who drives the session, and how much review?
+
+```mermaid
+flowchart TD
+    New["New session/task"] --> Arch{"Architecture, incident\ndebugging, cross-repo\ncontracts, hard to unwind?"}
+    Arch -->|"Yes"| Strong["Strongest model drives\n(orchestrates, judges,\nsynthesizes)"]
+    Arch -->|"No (mechanical/\nbulk/routine)"| Cheap["Cheaper model drives +\nconsult advisor at the\nplan gate and final review"]
+
+    Diff["Diff ready"] --> Trigger{"Touches schema / API /\nauth / migrations /\ncross-repo contracts?"}
+    Trigger -->|"Yes (hard trigger)"| Persona["Independent fresh-context\npersona review (lf-code-review)"]
+    Persona --> Adversarial["Optional second-model\nadversarial pass"]
+    Adversarial --> Load{"Findings load-bearing?"}
+    Load -->|"Yes"| Fix["Fix P1/P2,\none follow-up pass"]
+    Fix --> Load
+    Load -->|"No (stylistic only)"| Ship["Stop — ship"]
+    Trigger -->|"No"| Size["Driver sizes the review:\nsmall diff = self-review +\ncorrectness persona;\nmedium = targeted persona set"]
+```
 
 ## Review policy (risk-tiered)
 
