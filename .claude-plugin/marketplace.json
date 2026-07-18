@@ -1,9 +1,14 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "lean-flow",
+  "description": "Lean Flow — planning-heavy, review-gated agentic engineering workflow for Claude Code",
   "owner": { "name": "ajanatka" },
   "plugins": [
     {
       "name": "lean-flow",
+      "version": "1.0.0",
+      "description": "Lean Flow workflow suite: brainstorm, plan, code/doc review personas, commit/PR, learning loop, session search",
+      "category": "productivity",
       "source": "./plugins/lean-flow"
     }
   ]

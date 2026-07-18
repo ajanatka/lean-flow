@@ -23,11 +23,19 @@ Together they cover the full loop: brainstorm → plan → implement → review 
 
 ## Quickstart
 
-1. **Add the marketplace and install the plugin:**
+1. **Add the marketplace and install the plugin.** This repo is itself a Claude Code plugin marketplace. Inside Claude Code:
    ```
    /plugin marketplace add ajanatka/lean-flow
+   /plugin install lean-flow@lean-flow
    ```
-   Then install the `lean-flow` plugin from that marketplace.
+   Or from your shell:
+   ```bash
+   claude plugin marketplace add ajanatka/lean-flow
+   claude plugin install lean-flow@lean-flow
+   ```
+   Restart Claude Code (or start a new session) and the `lf-*` skills and reviewer agents are available. To pick up future updates: `claude plugin marketplace update lean-flow`.
+
+   > **Access note:** if this repo is private, `marketplace add` only works for GitHub accounts with access to it (Claude Code clones via your local git credentials). Ask the owner for access, or use the repo's public URL form once it's public: `/plugin marketplace add https://github.com/ajanatka/lean-flow`.
 
 2. **Install the harness** (hooks + dispatch-lane agents):
    ```bash
