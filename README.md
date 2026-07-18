@@ -54,6 +54,10 @@ Together they cover the full loop: brainstorm → plan → implement → review 
 
 `lf-brainstorm` turns a vague idea into a requirements doc. `lf-plan` turns that into an implementation plan, reviewed by `lf-doc-review`'s persona agents (coherence, product-lens, scope-guardian, feasibility, and more as the plan warrants). Implementation happens against that plan — guided by the `lf-work-lite` checklist, with routine work dispatched to `sonnet-worker`/`scan-worker` rather than done inline. Before a PR opens, `lf-code-review` dispatches its own persona set (correctness and testing always run; security, reliability, performance, and others join based on what the diff touches). `lf-commit-push-pr` ships it. On merge, two `Stop` hooks fire: `learn-stop-gate.sh` blocks until `learning-writer` documents the fix in `docs/solutions/`, and `docs-freshness-gate.sh` blocks until `docs-writer` updates the reference docs. The full walkthrough, with a diagram, is in `docs/overview.md`.
 
+## Beyond the box: the optimized setup
+
+The plugin + harness above is the complete, self-contained core — everything you need to run the brainstorm → plan → implement → review → learn loop. The setup this project grew alongside also leans on a handful of surrounding tools that make it cheap to run *continuously* rather than occasionally: a command-output filter that keeps raw build/test/git noise out of model context, a code-graph index so agents query structure instead of re-reading whole files, a semantic layer over the `docs/solutions/` learning corpus, a light local index for issue-tracker dedup, and an independent second-model review pass. None of these are required — Lean Flow works without any of them — but they're what keeps token spend proportional to the work even as a codebase and its history of learning docs grow. See `docs/optimizations.md`.
+
 ## Docs
 
 - `docs/overview.md` — how the pieces wire together, with a diagram
@@ -62,7 +66,8 @@ Together they cover the full loop: brainstorm → plan → implement → review 
 - `docs/hooks.md` — per-hook reference, settings.json wiring, optional-hook config
 - `docs/orchestration.md` — model routing, handoff packets, return contracts, review policy
 - `docs/customization.md` — Linear config, swapping trackers, the learning-doc schema, disabling gates
+- `docs/optimizations.md` — the surrounding toolchain: output filtering, code-graph memory, institutional memory, second-model review
 
 ## License
 
-MIT. Lean Flow is a derivative of [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin) — see `LICENSE` and `ATTRIBUTION.md` for the full license text and a description of what was renamed, debranded, genericized, and added.
+MIT. Portions derived and customized from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin) — see `LICENSE` and `ATTRIBUTION.md` for the full license text and a description of what was renamed, debranded, genericized, and added.
