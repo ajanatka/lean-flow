@@ -106,23 +106,18 @@ Routing rules:
 
 ## Reviewers
 
-15 reviewer personas in layered conditionals, plus LF-specific agents. See the persona catalog included below for the full catalog.
+15 reviewer personas, selected by risk tier rather than a fixed always-on floor, plus LF-specific agents. See the persona catalog included below for the full catalog.
 
-**Always-on (every review):**
+**Hard triggers** (schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind): dispatch exactly `lf-correctness-reviewer` plus whichever of `lf-security-reviewer` or `lf-adversarial-reviewer` fits the diff, both with `model: "opus"` (see Stage 4 model tiering). The Codex adversarial pass remains the third leg, run outside this skill as R2.
 
-| Agent | Focus |
-|-------|-------|
+**Everything else:** the driver picks 0-2 personas from the catalog below by diff domain. Skipping the persona team entirely is legitimate for small, low-risk diffs -- do not pad the team to hit a floor.
+
+| Agent | Select when diff touches... |
+|-------|---------------------------|
 | `lf-correctness-reviewer` | Logic errors, edge cases, state bugs, error propagation |
 | `lf-testing-reviewer` | Coverage gaps, weak assertions, brittle tests |
 | `lf-maintainability-reviewer` | Coupling, complexity, naming, dead code, abstraction debt |
 | `lf-project-standards-reviewer` | CLAUDE.md and AGENTS.md compliance -- frontmatter, references, naming, portability |
-| `lf-agent-native-reviewer` | Verify new features are agent-accessible |
-| `lf-learnings-researcher` | Search docs/solutions/ for past issues related to this PR |
-
-**Conditional (selected per diff):**
-
-| Agent | Select when diff touches... |
-|-------|---------------------------|
 | `lf-security-reviewer` | Auth, public endpoints, user input, permissions |
 | `lf-performance-reviewer` | DB queries, data transforms, caching, async |
 | `lf-api-contract-reviewer` | Routes, serializers, type signatures, versioning |
@@ -133,16 +128,23 @@ Routing rules:
 | `lf-code-simplicity-reviewer` | Final pass once an implementation is otherwise complete -- YAGNI violations, simplification opportunities |
 | `lf-previous-comments-reviewer` | Reviewing a PR that has existing review comments or threads |
 
-**Stack-specific conditional (selected per diff):**
+**Stack-specific (selected per diff, counts toward the 0-2 budget):**
 
 | Agent | Select when diff touches... |
 |-------|---------------------------|
 | `lf-python-reviewer` | Python modules, endpoints, scripts, or services |
 | `lf-typescript-reviewer` | TypeScript components, services, hooks, utilities, or shared types |
 
+**LF-specific agents (always-on, every review):**
+
+| Agent | Focus |
+|-------|-------|
+| `lf-agent-native-reviewer` | Verify new features are agent-accessible |
+| `lf-learnings-researcher` | Search docs/solutions/ for past issues related to this PR |
+
 ## Review Scope
 
-Every review spawns all 4 always-on personas plus the 2 LF always-on agents, then adds whichever conditionals fit the diff. The model naturally right-sizes: a small config change triggers 0 conditionals = 6 reviewers. A high-risk auth feature might trigger security + reliability + adversarial = 9 reviewers.
+Selection is risk-tiered, not a fixed floor. A hard-trigger diff spawns exactly 2 personas (opus) plus the 2 LF always-on agents = 4 reviewers, with the Codex adversarial pass as a third leg outside the skill. Everything else spawns 0-2 driver-picked personas plus the 2 LF always-on agents -- a small config change may warrant 0 personas = 2 reviewers; a diff that clearly needs both a domain persona and its language lens may warrant 2 = 4 reviewers. Skipping the persona team is the expected outcome for low-risk diffs, not an edge case to justify.
 
 ## Protected Artifacts
 
@@ -348,28 +350,31 @@ If a plan is found, read its **Requirements Trace** (R1, R2, etc.) and **Impleme
 
 ### Stage 3: Select reviewers
 
-Read the diff and file list from Stage 1. The 4 always-on personas and 2 LF always-on agents are automatic. For each cross-cutting and stack-specific conditional persona in the persona catalog included below, decide whether the diff warrants it. This is agent judgment, not keyword matching.
+Read the diff and file list from Stage 1. The 2 LF always-on agents are automatic. Then decide the persona team by risk tier: on a hard-trigger diff, the team is exactly `lf-correctness-reviewer` plus whichever of `lf-security-reviewer` or `lf-adversarial-reviewer` fits (both `model: "opus"`, per Stage 4). Otherwise, pick 0-2 personas from the catalog included below by diff domain -- this is agent judgment, not keyword matching, and picking zero is a legitimate outcome for small, low-risk diffs.
 
 **File-type awareness for conditional selection:** Instruction-prose files (Markdown skill definitions, JSON schemas, config files) are product code but do not benefit from runtime-focused reviewers. The adversarial reviewer's techniques (race conditions, cascade failures, abuse cases) target executable code behavior. For diffs that only change instruction-prose files, skip adversarial unless the prose describes auth, payment, or data-mutation behavior. Count only executable code lines toward line-count thresholds.
 
 **`previous-comments` is PR-only.** Only select this persona when Stage 1 gathered PR metadata (PR number or URL was provided as an argument, or `gh pr view` returned metadata for the current branch). Skip it entirely for standalone branch reviews with no associated PR -- there are no prior comments to check.
 
-Stack-specific personas are additive. A TypeScript API diff may warrant `typescript-reviewer` plus `api-contract` and `reliability`; a Python service diff may warrant `python-reviewer` plus `data-integrity`.
+Stack-specific personas count toward the 0-2 budget like any other. A Python service diff touching persistent data may warrant `python-reviewer` plus `data-integrity`; a small doc-only diff may warrant none.
 
-Announce the team before spawning:
+Announce the team before spawning. Example on a hard-trigger diff:
+
+```
+Review team (hard trigger -- schema change):
+- lf-agent-native-reviewer (always)
+- lf-learnings-researcher (always)
+- correctness (hard trigger, opus)
+- adversarial (hard trigger, opus) -- migration touches a constraint on a high-write table
+```
+
+Example on a routine diff:
 
 ```
 Review team:
-- correctness (always)
-- testing (always)
-- maintainability (always)
-- project-standards (always)
 - lf-agent-native-reviewer (always)
 - lf-learnings-researcher (always)
-- security -- new endpoint in routes.py accepts user-provided redirect URL
 - python-reviewer -- endpoint handler and service logic changed
-- data-migrations -- adds migration 20260303_add_index_to_orders
-- data-integrity -- migration touches a constraint on a high-write table
 ```
 
 This is progress reporting, not a blocking confirmation.
@@ -389,11 +394,11 @@ Pass the resulting path list to the `project-standards` persona inside a `<stand
 
 Review execution is Sonnet by default. Every persona sub-agent and LF agent runs on the platform's mid-tier model, regardless of the session's driving model, unless the hard-trigger escalation below applies to it. In Claude Code, pass `model: "sonnet"` in the Agent tool call. On other platforms, use the equivalent mid-tier (e.g., `gpt-5.4-mini` in Codex as of April 2026). If the platform has no model override mechanism or the available model names are unknown, omit the model parameter and let agents inherit the default -- a working review on the parent model is better than a broken dispatch from an unrecognized model name.
 
-Under a Fable orchestrator this is intentional: Fable's role is orchestration and validation -- intent discovery, reviewer selection, finding merge/dedup, and synthesis -- never review execution itself. No persona sub-agent inherits the Fable (or Opus) session model; model choice for a persona is always explicit -- sonnet by default, opus only for the three named reviewers on the hard-trigger paragraph below. Capability at the orchestrator layer does not otherwise extend to the reviewers it dispatches.
+Under a Fable orchestrator this is intentional: Fable's role is orchestration and validation -- intent discovery, reviewer selection, finding merge/dedup, and synthesis -- never review execution itself. No persona sub-agent inherits the Fable (or Opus) session model; model choice for a persona is always explicit -- sonnet by default, opus only for the two named reviewers on the hard-trigger paragraph below. Capability at the orchestrator layer does not otherwise extend to the reviewers it dispatches.
 
 The orchestrator (this skill) inherits the session model; it handles intent discovery, reviewer selection, finding merge/dedup, and synthesis -- tasks that benefit from the same reasoning capability the user configured.
 
-**Hard-trigger escalation (conditional).** When the diff hits a hard trigger -- schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind -- dispatch `lf-correctness-reviewer`, `lf-security-reviewer`, and `lf-adversarial-reviewer` with `model: "opus"` (per-call override; frontmatter stays sonnet). These three perform the analysis where model depth changes findings. All other personas remain sonnet even on hard triggers. On platforms without a per-call override, fall back to the default model rather than failing the dispatch.
+**Hard-trigger escalation (conditional).** When the diff hits a hard trigger -- schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind -- the persona team is exactly `lf-correctness-reviewer` plus whichever of `lf-security-reviewer` or `lf-adversarial-reviewer` fits the diff, both with `model: "opus"` (per-call override; frontmatter stays sonnet). These two perform the analysis where model depth changes findings; the Codex adversarial pass is the third leg of the trio, run outside this skill as R2. All other personas remain sonnet even on hard triggers. On platforms without a per-call override, fall back to the default model rather than failing the dispatch.
 
 #### Run ID
 
@@ -603,7 +608,7 @@ Before delivering the review, verify:
 
 ## Language-Aware Conditionals
 
-This skill uses stack-specific reviewer agents when the diff clearly warrants them. Keep those agents opinionated. They are not generic language checkers; they add a distinct review lens on top of the always-on and cross-cutting personas.
+This skill uses stack-specific reviewer agents when the diff clearly warrants them. Keep those agents opinionated. They are not generic language checkers; they add a distinct review lens on top of the LF always-on agents and whichever cross-cutting personas the risk tier selected.
 
 Do not spawn them mechanically from file extensions alone. The trigger is meaningful changed behavior, architecture, or UI state in that stack.
 
