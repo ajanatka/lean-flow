@@ -35,7 +35,7 @@ merges=${merges:-0}
 [ "$merges" -eq 0 ] && exit 0
 
 # Learning evidence: lf-learn skill invocation or a docs/solutions write.
-learned=$(grep -o '"command":[^,}]*\|"skill":[^,}]*\|"file_path":[^,}]*' "$tp" 2>/dev/null | grep -c 'lf-learn\|docs/solutions/')
+learned=$(grep -o '"command":[^,}]*\|"skill":[^,}]*\|"file_path":[^,}]*\|"subagent_type":[^,}]*' "$tp" 2>/dev/null | grep -c 'lf-learn\|docs/solutions/\|learning-writer')
 learned=${learned:-0}
 [ "$learned" -gt 0 ] && exit 0
 
