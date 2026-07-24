@@ -1,12 +1,12 @@
 # Orchestration: model routing and token economics
 
-This is the reasoning behind the harness dispatch-lane agents (`docs/agents.md`) and the `model-triage-nudge.sh` hook (`docs/hooks.md`). It's guidance, not a script — adapt the specific model names to whatever tiers your provider(s) offer.
+This is the reasoning behind the harness dispatch-lane agents (`docs/agents.md`). It's guidance, not a script — adapt the specific model names to whatever tiers your provider(s) offer.
 
 ## Orchestrator vs. worker lanes
 
 The core idea: the model driving the session and the model doing the work don't have to be the same model, and usually shouldn't be.
 
-- **The strongest model available orchestrates, judges, and synthesizes.** It decomposes tasks, makes architectural calls, reconciles conflicting findings, and does final review. It should spend very little of its own context reading files end-to-end or writing implementation code directly.
+- **The strongest model available orchestrates, judges, synthesizes — and implements anything whose spec does not close.** It decomposes tasks, makes architectural calls, reconciles findings, and does final review. Delegating is what needs justification, not keeping work inline; see "Cap delegation" below.
 - **A mid-tier model (e.g. Sonnet-class) implements from bounded briefs.** Once the orchestrator has decomposed a task into a self-contained handoff packet, a cheaper model executes it. This is `sonnet-worker`.
 - **A cheap, fast model (e.g. Haiku-class) scans, reads, and reduces.** File discovery, grep sweeps, log reduction, config reads, inventory tasks — anything where the orchestrator needs a conclusion, not a raw dump. This is `scan-worker`.
 
@@ -18,8 +18,8 @@ The failure mode this prevents: dispatching a bare general-purpose subagent with
 flowchart TD
     Start["Task identified"] --> Kind{"What kind of work?"}
     Kind -->|"Read / scan / log reduction"| Scan["scan-worker (Haiku)"]
-    Kind -->|"Routine implementation\nfrom a bounded brief"| Sonnet["sonnet-worker (Sonnet)\nDEFAULT FLOOR"]
-    Kind -->|"Novel debugging /\nedge-case-dense code"| SonnetOpus["sonnet-worker\nwith model:opus override\n(kept rare)"]
+    Kind -->|"Implementation from a\nCLOSED spec"| Sonnet["sonnet-worker (Sonnet)\nfloor for DISPATCHED work"]
+    Kind -->|"OPEN spec —\njudgment will arise"| SonnetOpus["sonnet-worker\nwith model:opus override\n(kept rare)"]
     Kind -->|"Design / UI"| Design["Strongest model +\na frontend-design skill"]
     Kind -->|"Issue-tracker writes"| Linear["linear-worker"]
     Kind -->|"Learning docs"| Learn["learning-writer"]
@@ -63,6 +63,30 @@ The mirror of the handoff packet — what a worker sends back. A worker returns 
 If the output is genuinely large (a generated report, a big inventory), the worker writes it to a file and returns the **path plus a short digest** (a couple hundred tokens), not the payload. The detail is one file-read away, so the orchestrator loses nothing but keeps its own context clean — and can reopen the cited source itself to verify anything load-bearing (see "Trust reports as leads" below).
 
 This is not the same thing as running lossy LLM-compression over structured findings — a bounded, schema'd return is the right fix for that. Compression belongs on genuinely freeform payloads (search results, transcripts), not on findings that already have a shape.
+
+## Cap delegation, don't encourage it
+
+Guidance written for models that under-delegated ("prefer subagents", "delegate anything
+parallel or bulky") ages badly. Current top-tier models reach for subagents readily on
+their own, and stacking encouragement on top of that bias produces sprawl: every subagent
+re-establishes context, re-explores, reports back, and the orchestrator then re-reads the
+report. The useful instruction now is a ceiling, not a floor.
+
+Delegate when the payoff clearly exceeds that overhead — genuinely independent, sizeable
+tracks: a wide multi-file investigation, file-disjoint phases of one program, a bulk
+mechanical sweep. Keep spawn counts low; one worker beats three when one can finish it.
+
+Do **not** delegate work you could finish in a handful of tool calls, a modest job split
+into pieces, or — importantly — **review and verification of your own work.** Current
+models already self-check; asking a subagent to double-check produces over-verification
+without improving the result. Independent, risk-gated review of a *diff* by a
+fresh-context reviewer is a different mechanism and still applies (see Review policy) —
+the thing to cut is ad-hoc "go check what I just did".
+
+Once you delegate, commit to it: brief precisely the first time, and don't re-derive a
+worker's findings after it reports. Independent briefs still go out in one message as a
+parallel batch — batching is about *how* to dispatch once you've decided, and that part
+is unchanged.
 
 ## Escalate on evidence, not prestige
 
@@ -117,7 +141,49 @@ Not every diff needs the same review weight. Tier by risk:
 
 ## Effort levels
 
-If your orchestrator model exposes an effort/reasoning-level knob, default to a moderate setting. Drop to a low setting for status/summary/mechanical-dispatch sessions where the orchestrator is mostly routing, not judging. Reserve a high setting for architecture decisions, risk analysis, and final review on hard triggers — raising effort for routine work burns tokens without changing outcomes.
+If your models expose an effort/reasoning knob, treat it as a first-class routing
+dimension alongside model choice — on current top-tier models it moves cost and latency
+more than it moves correctness on routine work.
+
+**Pin it per agent, explicitly.** In most harnesses a subagent's effort *inherits from
+the session* when the frontmatter omits it. A session left at a high setting therefore
+runs every unpinned worker — issue writers, doc writers, log scanners — at the most
+expensive reasoning tier, silently, with nothing in the transcript showing it. This is
+the single easiest cost regression to ship and the hardest to notice. Every agent in
+`harness/agents/` and `plugins/lean-flow/agents/` pins `effort:` for that reason.
+
+Rough shape, adapt to your provider's ladder:
+
+| Work | Effort |
+|---|---|
+| Templated writes, log reduction, file discovery, inventory | lowest |
+| Doc/prose authoring from a packet, most review personas | low-middle |
+| Implementation from a bounded brief | middle-high |
+| Architecture, risk analysis, novel debugging, final review on hard triggers | high |
+| Correctness mattering more than cost, on a genuinely hard problem | top |
+
+**Review personas are a special case: tier them by whether they read or reproduce.**
+Effort's most consequential effect on a reviewer is how many tool calls it makes, not how
+hard it thinks about the diff. A persona that reads code and reasons holds its accuracy at
+a low tier on current models. A persona that earns its keep by *constructing a failure* —
+running the thing, measuring the corpus, reproducing in a sandbox — needs the budget, and
+that is where the highest-severity findings actually come from.
+
+So: retrieval and single-question lenses at the lowest tier, reading-based defect finders
+in the middle, and keep exactly one or two reproduction-based lanes high. Nothing in a
+review roster warrants the top tiers — those are the coding/agentic settings.
+
+Keep at least one deep in-family lane even when an out-of-family adversarial pass exists.
+They do not overlap: an out-of-family reviewer sees whatever you hand it and is strong on
+local code defects, while a deep in-family reviewer given the whole system finds the
+design and doctrine failures. Losing either loses a distinct class.
+
+Two calibration notes. First, **start a class of work at the tier you think it needs and
+then sweep down** — current models hold quality at lower effort far better than their
+predecessors, and defaults carried over from an older model are usually a tier too high.
+Second, **effort is not a verbosity control.** If output is longer than you want, say so
+in the prompt; lowering effort changes how much the model thinks, not how much it writes.
+
 
 ## Output discipline
 

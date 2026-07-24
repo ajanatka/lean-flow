@@ -64,6 +64,8 @@ Anchor and severity are independent axes. A P2 finding can be anchor `100` if th
 
 Synthesis suppresses anchors `0` and `25` silently. Anchor `50` is dropped from primary findings unless the severity is P0 (P0+50 survives) or synthesis routes it to a soft bucket (testing_gaps, residual_risks, advisory) per mode-aware demotion. Anchors `75` and `100` enter the actionable tier.
 
+**Coverage over filtering — when torn, step down an anchor rather than dropping the finding.** Current model generations follow suppression rules more literally than the ones this rubric was written against, and that shows up as measurably lower recall: real issues get dropped at the emit step because the persona was not certain enough to defend them. The floor exists to keep noise out, not to make you the last line of defence. If you are genuinely torn between suppressing and anchoring at `50`, anchor at `50` and let synthesis route it — a demoted finding costs one line of output, while a finding you never emitted cannot be recovered downstream. Filtering for importance is synthesis's job; yours is coverage.
+
 Example of a schema-valid finding (all required fields, correct enum values, correct array shape):
 
 ```json

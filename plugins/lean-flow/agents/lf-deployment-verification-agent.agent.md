@@ -2,6 +2,7 @@
 name: lf-deployment-verification-agent
 description: "Produces a concrete, executable Go/No-Go deployment checklist -- SQL verification queries, rollback procedures, monitoring plan -- for risky data deployments. Dispatch when a PR touches production data, migrations, or other risky data changes."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

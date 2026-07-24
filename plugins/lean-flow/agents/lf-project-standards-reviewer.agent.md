@@ -2,6 +2,7 @@
 name: lf-project-standards-reviewer
 description: Audits code changes against the project's own CLAUDE.md/AGENTS.md standards -- frontmatter rules, reference inclusion, naming conventions, cross-platform portability, tool-selection policy. Always-on persona -- dispatch on every code review to catch violations of rules the project has explicitly written down.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 

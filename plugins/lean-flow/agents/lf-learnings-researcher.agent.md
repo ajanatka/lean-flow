@@ -2,6 +2,7 @@
 name: lf-learnings-researcher
 description: "Searches docs/solutions/ for applicable past learnings (bugs, architecture/design patterns, tooling decisions, conventions, workflow discoveries) by frontmatter metadata. Dispatch before implementing features, making decisions, or starting work in a documented area, so institutional knowledge carries forward."
 model: sonnet
+effort: low
 tools: Read, Grep, Glob, Bash, ToolSearch
 ---
 

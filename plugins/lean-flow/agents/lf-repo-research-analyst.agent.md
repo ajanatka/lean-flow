@@ -2,6 +2,7 @@
 name: lf-repo-research-analyst
 description: "Conducts thorough research on repository structure, documentation, conventions, and implementation patterns, with optional Scope: filtering to run only requested research phases. Dispatch when onboarding to a new codebase or when a task needs grounding in project conventions."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

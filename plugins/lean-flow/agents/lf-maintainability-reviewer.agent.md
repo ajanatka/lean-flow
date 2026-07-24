@@ -2,6 +2,7 @@
 name: lf-maintainability-reviewer
 description: Reviews code for premature abstraction, unnecessary indirection, dead code, cross-module coupling, and naming that obscures intent. Always-on persona -- dispatch on every code review.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 

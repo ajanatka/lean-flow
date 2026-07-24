@@ -2,6 +2,7 @@
 name: lf-design-lens-reviewer
 description: "Reviews a planning document for missing design decisions -- information architecture, interaction states, user flows, AI-slop risk -- using dimensional 0-10 ratings to surface gaps. Dispatched by the document-review skill for plans with a user-facing surface."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

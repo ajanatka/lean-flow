@@ -18,7 +18,7 @@
 set -u
 
 # Fleet guard: headless fleet agents (LF_FLEET_AGENT set) skip interactive-only hooks
-if [ -n "${LF_FLEET_AGENT:-}" ]; then exit 0; fi
+if [ -n "${LF_FLEET_AGENT:-}${HANO_FLEET_AGENT:-}" ]; then exit 0; fi
 
 [ -f "$HOME/.claude/lean-flow.env" ] && source "$HOME/.claude/lean-flow.env"
 [ -n "${LF_LINEAR_TEAM_KEY:-}" ] && [ -n "${LF_LINEAR_TEAM_ID:-}" ] || exit 0

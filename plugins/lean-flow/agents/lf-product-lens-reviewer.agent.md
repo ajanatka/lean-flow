@@ -2,6 +2,7 @@
 name: lf-product-lens-reviewer
 description: "Reviews a planning document as a senior product leader -- challenges premise claims, weighs strategic consequences (trajectory, identity, adoption, opportunity cost), and surfaces goal-work misalignment; domain-agnostic across end users, developers, or operators. Dispatched by the document-review skill on every plan review."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

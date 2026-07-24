@@ -3,7 +3,12 @@
   "title": "Code Review Findings",
   "description": "Structured output schema for code review sub-agents",
   "type": "object",
-  "required": ["reviewer", "findings", "residual_risks", "testing_gaps"],
+  "required": [
+    "reviewer",
+    "findings",
+    "residual_risks",
+    "testing_gaps"
+  ],
   "properties": {
     "reviewer": {
       "type": "string",
@@ -35,7 +40,12 @@
           },
           "severity": {
             "type": "string",
-            "enum": ["P0", "P1", "P2", "P3"],
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ],
             "description": "Issue severity level"
           },
           "file": {
@@ -53,12 +63,22 @@
           },
           "autofix_class": {
             "type": "string",
-            "enum": ["safe_auto", "gated_auto", "manual", "advisory"],
+            "enum": [
+              "safe_auto",
+              "gated_auto",
+              "manual",
+              "advisory"
+            ],
             "description": "Reviewer's conservative recommendation for how this issue should be handled after synthesis"
           },
           "owner": {
             "type": "string",
-            "enum": ["review-fixer", "downstream-resolver", "human", "release"],
+            "enum": [
+              "review-fixer",
+              "downstream-resolver",
+              "human",
+              "release"
+            ],
             "description": "Who should own the next action for this finding after synthesis"
           },
           "requires_verification": {
@@ -66,18 +86,29 @@
             "description": "Whether any fix for this finding must be re-verified with targeted tests or a follow-up review pass"
           },
           "suggested_fix": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Concrete minimal fix. Omit or null if no good fix is obvious -- a bad suggestion is worse than none."
           },
           "confidence": {
             "type": "integer",
-            "enum": [0, 25, 50, 75, 100],
+            "enum": [
+              0,
+              25,
+              50,
+              75,
+              100
+            ],
             "description": "Anchored confidence score. Use exactly one of 0, 25, 50, 75, 100. Each anchor has a behavioral criterion the reviewer must honestly self-apply. 0: Not confident. This is a false positive that does not stand up to light scrutiny, or a pre-existing issue this PR did not introduce. 25: Somewhat confident. Might be a real issue but could also be a false positive; the reviewer could not verify from the diff and surrounding code alone. 50: Moderately confident. The reviewer verified this is a real issue but it may be a nitpick, narrow edge case, or have minimal practical impact. Relative to the diff's other concerns, it is not very important. Style preferences and subjective improvements land here. 75: Highly confident. The reviewer double-checked the diff and confirmed the issue will affect users, downstream callers, or runtime behavior in normal usage. The bug, vulnerability, or contract violation is clearly present and actionable. 100: Absolutely certain. The issue is verifiable from the code itself -- compile error, type mismatch, definitive logic bug, or an explicit project-standards violation with a quotable rule. No interpretation required."
           },
           "evidence": {
             "type": "array",
             "description": "Code-grounded evidence: snippets, line references, or pattern descriptions. At least 1 item.",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "minItems": 1
           },
           "pre_existing": {
@@ -90,26 +121,29 @@
     "residual_risks": {
       "type": "array",
       "description": "Risks the reviewer noticed but could not confirm as findings",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "testing_gaps": {
       "type": "array",
       "description": "Missing test coverage the reviewer identified",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   },
-
   "_meta": {
     "confidence_anchors": {
       "description": "Confidence is one of 5 discrete anchors (0, 25, 50, 75, 100), each tied to a behavioral criterion the reviewer can honestly self-apply. Float values (e.g., 0.73) are not valid -- the model cannot meaningfully calibrate at finer granularity, and discrete anchors prevent false-precision gaming.",
       "0": "False positive or pre-existing -- do not report",
       "25": "Speculative; could not verify -- do not report",
-      "50": "Verified real but minor or stylistic -- report only when P0 or when synthesis routes to advisory/soft buckets",
+      "50": "Verified real but narrow, low-impact, or stylistic. Emit it -- synthesis routes it to advisory/residual_risks/testing_gaps, or keeps it if severity is P0.",
       "75": "Highly confident, will affect users or runtime in normal usage -- report",
       "100": "Verifiable from code alone (compile error, type mismatch, definitive logic bug, quoted standards violation) -- report"
     },
     "confidence_thresholds": {
-      "suppress": "Below anchor 75 -- do not report. Exception: P0 findings at anchor 50+ may be reported (critical-but-uncertain issues must not be silently dropped).",
+      "suppress": "Anchors 0 and 25 only -- do not emit. Anchor 50 and above is ALWAYS emitted: synthesis owns filtering and routes weak findings to soft buckets. Your job at this stage is coverage, not importance. When torn between suppressing and anchoring at 50, anchor at 50.",
       "report": "Anchor 75 or 100 -- include with full evidence."
     },
     "severity_definitions": {

@@ -2,6 +2,7 @@
 name: lf-feasibility-reviewer
 description: "Evaluates whether a planning document's proposed technical approach will survive contact with reality -- architecture conflicts, dependency gaps, migration risks, and implementability. Dispatched by the document-review skill for plans making non-trivial technical commitments."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

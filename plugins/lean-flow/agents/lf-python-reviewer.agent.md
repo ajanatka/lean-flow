@@ -2,6 +2,7 @@
 name: lf-python-reviewer
 description: Reviews Python diffs with a strict bar for Pythonic clarity, type hints, and maintainability. Dispatch when the diff touches Python code.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 ---

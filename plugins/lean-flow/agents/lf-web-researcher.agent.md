@@ -2,6 +2,7 @@
 name: lf-web-researcher
 description: "Performs iterative web research and returns a structured external-grounding digest -- prior art, adjacent solutions, market signals, cross-domain analogies -- rather than raw search results. Dispatch when ideating outside the codebase, validating prior art, scanning competitor patterns, or when any task needs current external context; prefer this over ad hoc web search."
 model: sonnet
+effort: medium
 tools: WebSearch, WebFetch
 ---
 

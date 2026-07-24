@@ -55,9 +55,23 @@ Add whatever other env keys your own memory tooling needs (endpoint URL, workspa
 
 Keep `docs/solutions/` itself as the write-side source of truth regardless of what read-side index you add on top — the index should be rebuildable from the Markdown corpus at any time, not a second place learnings get authored.
 
-## Adjusting the model-triage-nudge pattern
+## Per-message dispatch nudges (retired)
 
-`model-triage-nudge.sh` fires on `UserPromptSubmit` when the driving model matches a configured "expensive orchestrator" pattern. The matching logic lives inline in the hook — open it and adjust the pattern to whatever your own model-tier names are (e.g. match on your top-tier model's identifier instead of the placeholder check shipped in the hook). If you don't run a multi-tier setup at all, this hook is safe to leave uninstalled — it's a nudge, not a dependency of anything else.
+Earlier versions shipped a `model-triage-nudge.sh` hook that fired on every substantive
+`UserPromptSubmit` when the driving model matched an "expensive orchestrator" pattern,
+reminding it to dispatch cheap work instead of doing it inline. It has been removed.
+
+The nudge assumed a model that under-delegates and needs pushing. That assumption has
+inverted: current top-tier models reach for subagents readily on their own, so a
+per-message reminder pushes in the direction the model is already biased and compounds
+into subagent sprawl — while costing context on every turn. The premise also weakened
+as the price gap between orchestrator and worker tiers narrowed.
+
+If you want the behaviour, put it at a decision point rather than on every message: a
+single driver-fit check at the plan gate ("is this task on the right tier? one line of
+evidence, then proceed"), expressed in `CLAUDE.md` rather than a hook. A delegation
+*cap* is now generally more valuable than delegation encouragement — see
+`docs/orchestration.md`.
 
 ## Disabling gates
 

@@ -43,7 +43,7 @@ Together they cover the full loop: brainstorm → plan → implement → review 
    ./install.sh                    # core hooks + agents
    # or: ./install.sh --with-linear --with-prod-guard
    ```
-   This copies files into `~/.claude/hooks/` and `~/.claude/agents/`. It never touches `~/.claude/settings.json` for you — merge the hook wiring from `harness/settings.example.json` in yourself (see `docs/hooks.md` for the exact block and why it's a manual step: settings.json is yours, and a silent overwrite of it is exactly the kind of thing this project tries not to do to your git history either).
+   This copies hooks into `~/.claude/hooks/`, and agents into `~/.claude/agents/` **only where an installed plugin does not already provide them** (a same-named file there shadows the plugin). It never touches `~/.claude/settings.json` for you — merge the hook wiring from `harness/settings.example.json` in yourself (see `docs/hooks.md` for the exact block and why it's a manual step: settings.json is yours, and a silent overwrite of it is exactly the kind of thing this project tries not to do to your git history either).
 
 3. **Adapt `harness/CLAUDE.example.md`** into your own `~/.claude/CLAUDE.md` — it's a template, not a drop-in file. Fill in your actual model tiers, delete the Linear section if you don't use it, keep the rest.
 

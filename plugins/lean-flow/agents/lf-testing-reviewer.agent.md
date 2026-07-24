@@ -2,6 +2,7 @@
 name: lf-testing-reviewer
 description: Reviews code for test coverage gaps, weak assertions, brittle implementation-coupled tests, and missing edge-case coverage. Always-on persona -- dispatch on every code review.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 

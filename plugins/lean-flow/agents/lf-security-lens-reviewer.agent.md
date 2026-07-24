@@ -2,6 +2,7 @@
 name: lf-security-lens-reviewer
 description: "Evaluates a planning document for security gaps at the plan level -- auth/authz assumptions, data exposure risks, API surface vulnerabilities, missing threat-model elements. Dispatched by the document-review skill when the plan introduces endpoints, data stores, integrations, or user inputs."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 
