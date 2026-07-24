@@ -26,17 +26,59 @@ mkdir -p "$DIR"
 marker="$DIR/$session_id"
 [ -f "$marker" ] && exit 0                # already gated once this session
 
-# Merge evidence: actual gh pr merge commands issued by this session
-# (tool_input command strings), not mere mentions in context.
-# NB: grep -c prints the count even when it exits 1 (zero matches) — never
-# append `|| echo 0`, it double-prints and breaks -eq.
-merges=$(grep -c '"command":[^,}]*gh pr merge' "$tp" 2>/dev/null)
-merges=${merges:-0}
+# Evidence extraction. Parsed structurally rather than grepped: the previous
+# regexes were wrong in both directions, and both failures silently PASSED a
+# session that should have been gated.
+#   - `"command":[^,}]*` stops at the first comma, so a real merge inside
+#     `gh pr view 42 --json state,mergeable && gh pr merge 42 --squash` was
+#     invisible. That exact shape is routine here.
+#   - `"file_path":` was never paired with a tool name, so merely READING an
+#     existing doc counted as having written one.
+read_evidence() {
+python3 - "$1" <<'PYEOF' 2>/dev/null
+import json, sys, re
+WRITE = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+merges = 0
+hits = set()
+PATTERNS = {
+    "learn": re.compile(r"docs/solutions/"),
+    "docs":  re.compile(r"docs/manual/|docs/architecture/|docs/api/|feature-reference"),
+}
+def walk(o):
+    global merges
+    if isinstance(o, dict):
+        name = o.get("name") or o.get("tool_name")
+        inp  = o.get("input") or o.get("tool_input") or {}
+        if isinstance(inp, dict):
+            cmd = inp.get("command") or ""
+            if name == "Bash" and isinstance(cmd, str):
+                # Must be at a COMMAND position, not merely mentioned. `rg "gh pr merge"`
+                # and `git log --grep=` must not count as having merged anything.
+                for seg in re.split(r"&&|\|\||;|\n", cmd):
+                    if re.match(r"\s*(?:\w+=\S+\s+)*gh\s+pr\s+merge\b", seg):
+                        merges += 1
+            fp = inp.get("file_path") or ""
+            if name in WRITE and isinstance(fp, str):
+                for k, pat in PATTERNS.items():
+                    if pat.search(fp): hits.add(k)
+        st = o.get("subagent_type") or ""
+        if isinstance(st, str):
+            if "learning-writer" in st: hits.add("learn")
+            if "docs-writer" in st:     hits.add("docs")
+        sk = o.get("skill") or ""
+        if isinstance(sk, str) and "lf-learn" in sk: hits.add("learn")
+        for v in o.values(): walk(v)
+    elif isinstance(o, list):
+        for v in o: walk(v)
+for line in open(sys.argv[1], errors="ignore"):
+    try: walk(json.loads(line))
+    except Exception: pass
+print(f"{merges} {int('learn' in hits)} {int('docs' in hits)}")
+PYEOF
+}
+read -r merges learned docs_written <<< "$(read_evidence "$tp")"
+merges=${merges:-0}; learned=${learned:-0}; docs_written=${docs_written:-0}
 [ "$merges" -eq 0 ] && exit 0
-
-# Learning evidence: lf-learn skill invocation or a docs/solutions write.
-learned=$(grep -o '"command":[^,}]*\|"skill":[^,}]*\|"file_path":[^,}]*\|"subagent_type":[^,}]*' "$tp" 2>/dev/null | grep -c 'lf-learn\|docs/solutions/\|learning-writer')
-learned=${learned:-0}
 [ "$learned" -gt 0 ] && exit 0
 
 touch "$marker"
