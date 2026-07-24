@@ -18,7 +18,7 @@
 set -u
 
 # Fleet guard: headless fleet agents (LF_FLEET_AGENT set) skip interactive-only hooks
-if [ -n "${LF_FLEET_AGENT:-}" ]; then exit 0; fi
+if [ -n "${LF_FLEET_AGENT:-}${HANO_FLEET_AGENT:-}" ]; then exit 0; fi
 
 input=$(cat)
 

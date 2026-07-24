@@ -76,11 +76,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/plan-completion-gate.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
             "command": "~/.claude/hooks/learn-stop-gate.sh",
             "timeout": 10
           },

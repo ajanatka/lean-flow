@@ -1,4 +1,19 @@
 #!/bin/bash
+# Stop hook: plan-completion gate. *** OPT-IN — NOT WIRED BY DEFAULT. ***
+#
+# PRECONDITION, and it is a real one: your repo must actually maintain checkbox
+# state in its plan docs. Measured in the repo this was written for, it does not —
+# 334 plan docs, 192 with unchecked items, only 28 fully ticked (~8%), and the most
+# recent *shipped* plan carries 6 unchecked and 0 checked. Against that corpus this
+# gate fires on completed work, and its block message pushes the model to keep
+# building at end-of-turn. Do not wire it until `- [x]` means something in your
+# plans.
+#
+# Known blind spot beyond that: it reads only the parent transcript, so a session
+# that DELEGATES the implementation to a subagent (whose turns land in a separate
+# JSONL) never arms it — which is the shape current routing doctrine steers toward.
+#
+# Original design note:
 # Stop hook: plan-completion gate. If this session implemented against a plan
 # document and that plan still has unchecked checklist items, block the stop ONCE
 # and list them.
@@ -31,7 +46,7 @@
 set -u
 
 # Fleet guard: headless fleet agents (LF_FLEET_AGENT set) skip interactive-only hooks
-if [ -n "${LF_FLEET_AGENT:-}" ]; then exit 0; fi
+if [ -n "${LF_FLEET_AGENT:-}${HANO_FLEET_AGENT:-}" ]; then exit 0; fi
 
 input=$(cat)
 
