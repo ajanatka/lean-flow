@@ -30,7 +30,7 @@ Use the anchored confidence rubric in the subagent template. Persona-specific gu
 
 **Anchor 75** — the performance impact is provable from the code: the N+1 is clearly inside a loop over user data, the blocking call is visibly on an async path. Real users will hit it under normal load.
 
-**Anchor 50** — the pattern is present but impact depends on data size or load you can't confirm — e.g., a query without LIMIT on a table whose size is unknown. Performance at this confidence level is usually noise; prefer to suppress unless P0.
+**Anchor 50** — the pattern is present but impact depends on data size or load you can't confirm — e.g., a query without LIMIT on a table whose size is unknown. Performance at this confidence level is usually noise; emit at anchor 50 and let synthesis route it unless P0.
 
 **Anchor 25 or below — suppress** — the issue is speculative or the optimization would only matter at extreme scale.
 

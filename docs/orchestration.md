@@ -6,7 +6,7 @@ This is the reasoning behind the harness dispatch-lane agents (`docs/agents.md`)
 
 The core idea: the model driving the session and the model doing the work don't have to be the same model, and usually shouldn't be.
 
-- **The strongest model available orchestrates, judges, and synthesizes.** It decomposes tasks, makes architectural calls, reconciles conflicting findings, and does final review. It should spend very little of its own context reading files end-to-end or writing implementation code directly.
+- **The strongest model available orchestrates, judges, synthesizes — and implements anything whose spec does not close.** It decomposes tasks, makes architectural calls, reconciles findings, and does final review. Delegating is what needs justification, not keeping work inline; see "Cap delegation" below.
 - **A mid-tier model (e.g. Sonnet-class) implements from bounded briefs.** Once the orchestrator has decomposed a task into a self-contained handoff packet, a cheaper model executes it. This is `sonnet-worker`.
 - **A cheap, fast model (e.g. Haiku-class) scans, reads, and reduces.** File discovery, grep sweeps, log reduction, config reads, inventory tasks — anything where the orchestrator needs a conclusion, not a raw dump. This is `scan-worker`.
 
@@ -18,8 +18,8 @@ The failure mode this prevents: dispatching a bare general-purpose subagent with
 flowchart TD
     Start["Task identified"] --> Kind{"What kind of work?"}
     Kind -->|"Read / scan / log reduction"| Scan["scan-worker (Haiku)"]
-    Kind -->|"Routine implementation\nfrom a bounded brief"| Sonnet["sonnet-worker (Sonnet)\nDEFAULT FLOOR"]
-    Kind -->|"Novel debugging /\nedge-case-dense code"| SonnetOpus["sonnet-worker\nwith model:opus override\n(kept rare)"]
+    Kind -->|"Implementation from a\nCLOSED spec"| Sonnet["sonnet-worker (Sonnet)\nfloor for DISPATCHED work"]
+    Kind -->|"OPEN spec —\njudgment will arise"| SonnetOpus["sonnet-worker\nwith model:opus override\n(kept rare)"]
     Kind -->|"Design / UI"| Design["Strongest model +\na frontend-design skill"]
     Kind -->|"Issue-tracker writes"| Linear["linear-worker"]
     Kind -->|"Learning docs"| Learn["learning-writer"]

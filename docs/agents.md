@@ -11,10 +11,10 @@ Two populations of agents ship with Lean Flow, and they answer different questio
 
 | Agent | Dispatch condition |
 |---|---|
-| `lf-correctness-reviewer` | Always-on. Logic errors, edge cases, state-management bugs, error-propagation failures. |
-| `lf-maintainability-reviewer` | Always-on. Premature abstraction, unnecessary indirection, dead code, cross-module coupling. |
-| `lf-testing-reviewer` | Always-on. Coverage gaps, weak assertions, brittle implementation-coupled tests. |
-| `lf-project-standards-reviewer` | Always-on. Audits the diff against the project's own CLAUDE.md/AGENTS.md rules. |
+| `lf-correctness-reviewer` | Risk-tiered (see lf-code-review). Logic errors, edge cases, state-management bugs, error-propagation failures. |
+| `lf-maintainability-reviewer` | Risk-tiered (see lf-code-review). Premature abstraction, unnecessary indirection, dead code, cross-module coupling. |
+| `lf-testing-reviewer` | Risk-tiered (see lf-code-review). Coverage gaps, weak assertions, brittle implementation-coupled tests. |
+| `lf-project-standards-reviewer` | Risk-tiered (see lf-code-review). Audits the diff against the project's own CLAUDE.md/AGENTS.md rules. |
 | `lf-security-reviewer` | Diff touches auth middleware, public endpoints, user input handling, or permission checks. |
 | `lf-reliability-reviewer` | Diff touches error handling, retries, circuit breakers, timeouts, health checks, async handlers. |
 | `lf-performance-reviewer` | Diff touches DB queries, loop-heavy data transforms, caching, I/O-intensive paths. |
@@ -35,7 +35,7 @@ Two populations of agents ship with Lean Flow, and they answer different questio
 | Agent | Dispatch condition |
 |---|---|
 | `lf-coherence-reviewer` | Every plan review. Internal consistency — contradictions, terminology drift, ambiguity. |
-| `lf-product-lens-reviewer` | Every plan review. Challenges premise claims and strategic consequences as a senior product leader. |
+| `lf-product-lens-reviewer` | Conditional (see lf-doc-review). Challenges premise claims and strategic consequences as a senior product leader. |
 | `lf-scope-guardian-reviewer` | Every plan review. Scope alignment, unjustified complexity, premature abstraction. |
 | `lf-feasibility-reviewer` | Plans making non-trivial technical commitments — will the approach survive contact with reality. |
 | `lf-design-lens-reviewer` | Plans with a user-facing surface — missing IA, interaction states, user flows. |

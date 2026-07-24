@@ -1,7 +1,7 @@
 #!/bin/bash
-# Stop hook: plan-completion gate. If this session did implementation work while
-# working from a plan document, and that plan still has unchecked checklist items,
-# block the stop ONCE and list them.
+# Stop hook: plan-completion gate. If this session implemented against a plan
+# document and that plan still has unchecked checklist items, block the stop ONCE
+# and list them.
 #
 # Why this exists: the other two Stop gates check that *documentation* got written
 # (learn-stop-gate → docs/solutions/, docs-freshness-gate → reference + manual).
@@ -10,6 +10,21 @@
 #
 # This is deliberately an external oracle: it grades against a checklist written
 # before the work, not against the session's own account of what it did.
+#
+# Arming requires BOTH, and both are deliberately narrow:
+#   (a) a docs/plans/*.md was WRITTEN OR EDITED this session — not merely read.
+#       Reading a plan is consulting it; a session genuinely working a plan ticks
+#       boxes in it. This is what keeps a plan-consulting session (e.g. platform-ops,
+#       which is instructed to read a plan doc) from being gated on someone else's
+#       parked checklist.
+#   (b) at least one edit to a NON-plan file, or a commit. Writing the plan itself
+#       must not count as implementing it, or every lf-plan session self-arms and
+#       gets told to start building — the exact scope expansion this model is
+#       already biased toward.
+#
+# Known limitation: a session that implements from a plan and never touches the
+# plan file is not gated. That case is indistinguishable from merely consulting a
+# plan, and a false block is worse than a missed one here.
 #
 # Loop-safe: stop_hook_active + a per-session marker → at most one block.
 
@@ -32,21 +47,42 @@ mkdir -p "$DIR"
 marker="$DIR/$session_id"
 [ -f "$marker" ] && exit 0                # already gated once this session
 
-# 1. Did this session work from a plan document? Only plans actually opened or
-#    edited count — a plan merely mentioned in prose does not arm the gate.
-plans=$(grep -o '"file_path":"[^"]*docs/plans/[^"]*\.md"' "$tp" 2>/dev/null \
-        | sed 's/.*"file_path":"//; s/"$//' | sort -u)
+# Parse the transcript properly rather than grepping loose fields: we need the
+# tool NAME paired with its file_path to tell "wrote the plan" from "read the plan".
+plans=$(python3 - "$tp" <<'PY' 2>/dev/null
+import json, sys, re
+WRITE = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+plan_edits, other_edits, commits = set(), 0, 0
+
+def walk(o):
+    global other_edits, commits
+    if isinstance(o, dict):
+        name = o.get("name") or o.get("tool_name")
+        inp  = o.get("input") or o.get("tool_input") or {}
+        if isinstance(inp, dict):
+            fp = inp.get("file_path") or ""
+            if name in WRITE and fp:
+                (plan_edits.add(fp) if re.search(r"docs/plans/[^/]+\.md$", fp)
+                 else globals().__setitem__("other_edits", other_edits + 1))
+            cmd = inp.get("command") or ""
+            if name == "Bash" and re.search(r"\bgit\s+commit\b", cmd):
+                commits += 1
+        for v in o.values(): walk(v)
+    elif isinstance(o, list):
+        for v in o: walk(v)
+
+for line in open(sys.argv[1], errors="ignore"):
+    try: walk(json.loads(line))
+    except Exception: pass
+
+# (a) a plan was written/edited AND (b) real implementation happened elsewhere
+if plan_edits and (other_edits or commits):
+    print("\n".join(sorted(plan_edits)))
+PY
+)
 [ -n "$plans" ] || exit 0
 
-# 2. Did it actually implement, or was it only reading? Research sessions that open
-#    a plan to answer a question must not trip this.
-edits=$(grep -c '"name":"\(Edit\|Write\|MultiEdit\|NotebookEdit\)"' "$tp" 2>/dev/null)
-edits=${edits:-0}
-commits=$(grep -c '"command":[^,}]*git commit' "$tp" 2>/dev/null)
-commits=${commits:-0}
-[ "$edits" -eq 0 ] && [ "$commits" -eq 0 ] && exit 0
-
-# 3. Any unchecked checklist items left in those plans?
+# Any unchecked checklist items left in those plans?
 report=""
 while IFS= read -r p; do
     [ -n "$p" ] && [ -f "$p" ] || continue
@@ -69,13 +105,13 @@ ${report}
 
 Before stopping, do one of these — do not just summarise and stop:
 
-  1. Finish them. If the remaining items are in scope and you can complete them,
-     do that now with tool calls rather than describing what is left.
-  2. Check off what actually landed. If an item is done but the box was never
+  1. Check off what actually landed. If an item is done but the box was never
      ticked, tick it — and cite the evidence (test name + result, file:line, or a
      command's real output). An item with no evidence is not done.
+  2. Finish the ones that are in scope for this session and that you can complete
+     now, with tool calls rather than a description of what is left.
   3. Say plainly what you are leaving and why. Out-of-scope for this session,
      blocked on a decision, deferred by agreement — state which, per item.
-     Scaling the work down is Andrew's call, not yours.
+     Scaling the work down is Andrew's call, not yours; expanding it is not.
 EOF
 exit 2

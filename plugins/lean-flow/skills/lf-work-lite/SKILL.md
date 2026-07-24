@@ -61,11 +61,12 @@ letting it infer scope.
 
 Apply the risk-tiered review policy:
 - **Hard triggers** — schema changes, API contract changes, auth changes, migrations,
-  cross-repo changes, or anything hard to unwind — require at least one independent
-  fresh-context review (Codex adversarial review or a fresh `lf-code-review` run),
-  regardless of which model drove the work.
-- When the driving model is **not Fable**, always run full `lf-code-review` plus a Codex
-  adversarial pass.
+  cross-repo changes, or anything hard to unwind — get the full independent
+  fresh-context set: the capped `lf-code-review` persona team **and** a Codex adversarial
+  pass, regardless of which model drove the work. Never one instead of the other.
+- **Everything else** — the driver sizes it: 0-2 personas by diff domain, and skipping the
+  persona team entirely is legitimate for small, low-risk diffs. Do not pad a team to hit a
+  floor, and do not escalate on the identity of the driving model.
 - Every residual review finding must end in one of four states: resolved, ticketed,
   explicitly accepted by the user, or actively blocking — never silently dropped.
 - **Post-merge closeout:** confirm Linear/program-map/tracker state matches what actually
@@ -90,7 +91,7 @@ Apply the risk-tiered review policy:
   that came back wrong, tooling friction? If yes, append one dated line to
   `docs/harness/friction-log.md` (create with a one-line header if absent): what happened +
   what change would prevent it (skill edit / new skill / hook tweak / CLAUDE.md line). Do NOT
-  build the fix now — the log is reviewed monthly (harness re-census) and repeat offenders
+  build the fix now — capture with `harness-note` so it lands in the friction backlog, reviewed weekly and repeat offenders
   become skills then.
 - Hand off commit/PR mechanics to `lean-flow:lf-commit-push-pr` — this skill does not do
   commit/PR work itself.
