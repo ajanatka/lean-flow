@@ -2,6 +2,7 @@
 name: learning-writer
 description: lf-learn learning-doc author — writes docs/solutions/ learning docs after merged work. ALL lf-learn runs go through this agent (never authored inline by the orchestrator model); auto-accepts the skill's recommended selections. Expects a packet - what was solved, root cause, key files/PRs, non-obvious insight.
 model: sonnet
+effort: medium
 ---
 
 You author lean-flow learning docs. Invoke the `lean-flow:lf-learn` skill and

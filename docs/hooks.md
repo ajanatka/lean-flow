@@ -12,7 +12,6 @@ Why hooks and not just instructions in CLAUDE.md: see `docs/overview.md` and `do
 | `git-ground-truth.sh` | `PreToolUse` (Bash) | Blocks commit/push on the default branch; blocks commit/push in a shared main checkout with linked worktrees; blocks commit/push when HEAD no longer matches the session's pinned branch. For other destructive git ops, injects ground truth non-blockingly. Overrides: `CLAUDE_ALLOW_MAIN=1`, `CLAUDE_ALLOW_SHARED_CHECKOUT=1`, `CLAUDE_REPIN=1` — literal command prefixes for deliberate exceptions. |
 | `git-pin-update.sh` | `PostToolUse` (Bash) | After a deliberate `git checkout`/`switch`/`worktree` command, updates the session's branch pin so an intentional branch change doesn't trip the drift block above. |
 | `gh-merge-guard.sh` | `PreToolUse` (Bash) | Blocks `gh pr merge <n>` when the PR's base branch isn't the repo's default branch (stacked-PR-merges-into-wrong-base is a real incident class: `gh` reports `MERGED` while the target branch gets nothing). Override: `CLAUDE_ALLOW_NONDEFAULT_BASE=1`. Also reminds, non-blockingly, that `MERGED` status is not the same as landing on the default branch. |
-| `model-triage-nudge.sh` | `UserPromptSubmit` | When the driving model is configured as an expensive orchestrator tier, injects a one-line reminder to triage the incoming prompt: dispatch to a cheap worker, or advise a cheaper `/model`. Skips trivial prompts (short replies, slash commands). Never blocks. |
 | `learn-stop-gate.sh` | `Stop` | If the session merged PR(s) but never ran `lf-learn` / wrote a `docs/solutions/` doc, blocks the stop once with instructions to dispatch `learning-writer` (or state explicitly that no learning applies / the skip was approved). Loop-safe via `stop_hook_active` + a per-session marker — blocks at most once. |
 | `docs-freshness-gate.sh` | `Stop` | Independent of the gate above: if the session merged PR(s) but never ran the docs pass or touched the documented surfaces, blocks the stop once with instructions to dispatch `docs-writer` (or state explicitly no doc update is needed). Sits after `learn-stop-gate.sh` in the close-out queue — `lf-learn` captures the learning, this captures the reference/manual update. Also loop-safe. |
 
@@ -39,9 +38,6 @@ Merge this `hooks` block into `~/.claude/settings.json` (create the file if it d
     ],
     "PostToolUse": [
       { "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/.claude/hooks/git-pin-update.sh", "timeout": 5 }] }
-    ],
-    "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "~/.claude/hooks/model-triage-nudge.sh", "timeout": 5 }] }
     ],
     "Stop": [
       { "hooks": [

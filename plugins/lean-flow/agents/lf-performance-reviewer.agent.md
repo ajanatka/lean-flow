@@ -2,6 +2,7 @@
 name: lf-performance-reviewer
 description: Reviews code for runtime performance and scalability issues that are measurable and production-observable, not theoretical micro-optimizations. Dispatch when the diff touches database queries, loop-heavy data transforms, caching layers, or I/O-intensive paths.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 

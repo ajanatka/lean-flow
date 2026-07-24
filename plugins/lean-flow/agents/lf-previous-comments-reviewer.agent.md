@@ -2,6 +2,7 @@
 name: lf-previous-comments-reviewer
 description: Checks whether prior PR review feedback has been addressed in the current diff, acting as institutional memory across the review cycle. Dispatch when reviewing a PR that already has existing review comments or threads.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: yellow
 

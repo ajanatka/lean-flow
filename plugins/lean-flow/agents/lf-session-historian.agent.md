@@ -2,6 +2,7 @@
 name: lf-session-historian
 description: "Searches Claude Code, Codex, and Cursor session history for prior sessions on the same problem or topic, surfacing investigation context, failed approaches, and learnings the current session can't see. Dispatch for learning-doc enrichment (via /lf-learn) or conversationally when asked about past work, recent activity, or prior investigations; supports time-based queries."
 model: sonnet
+effort: medium
 ---
 
 **Note: The current year is 2026.** Use this when interpreting session timestamps.

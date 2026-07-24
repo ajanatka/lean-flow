@@ -2,6 +2,7 @@
 name: lf-architecture-strategist
 description: "Analyzes code changes against established architectural patterns, service boundaries, and design integrity. Dispatch when reviewing PRs that add services or perform structural refactors."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

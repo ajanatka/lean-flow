@@ -2,6 +2,7 @@
 name: lf-api-contract-reviewer
 description: Reviews code for breaking API contract changes from the perspective of every existing consumer. Dispatch when the diff touches API routes, request/response types, serialization, versioning, or exported type signatures.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 color: blue
 

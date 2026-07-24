@@ -2,6 +2,7 @@
 name: lf-coherence-reviewer
 description: "Reviews a planning document for internal consistency -- contradictions between sections, terminology drift, structural issues, and ambiguity a reader could diverge on. Dispatched by the document-review skill on every plan review."
 model: haiku
+effort: low
 tools: Read, Grep, Glob, Bash
 ---
 

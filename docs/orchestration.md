@@ -1,6 +1,6 @@
 # Orchestration: model routing and token economics
 
-This is the reasoning behind the harness dispatch-lane agents (`docs/agents.md`) and the `model-triage-nudge.sh` hook (`docs/hooks.md`). It's guidance, not a script — adapt the specific model names to whatever tiers your provider(s) offer.
+This is the reasoning behind the harness dispatch-lane agents (`docs/agents.md`). It's guidance, not a script — adapt the specific model names to whatever tiers your provider(s) offer.
 
 ## Orchestrator vs. worker lanes
 
@@ -64,6 +64,30 @@ If the output is genuinely large (a generated report, a big inventory), the work
 
 This is not the same thing as running lossy LLM-compression over structured findings — a bounded, schema'd return is the right fix for that. Compression belongs on genuinely freeform payloads (search results, transcripts), not on findings that already have a shape.
 
+## Cap delegation, don't encourage it
+
+Guidance written for models that under-delegated ("prefer subagents", "delegate anything
+parallel or bulky") ages badly. Current top-tier models reach for subagents readily on
+their own, and stacking encouragement on top of that bias produces sprawl: every subagent
+re-establishes context, re-explores, reports back, and the orchestrator then re-reads the
+report. The useful instruction now is a ceiling, not a floor.
+
+Delegate when the payoff clearly exceeds that overhead — genuinely independent, sizeable
+tracks: a wide multi-file investigation, file-disjoint phases of one program, a bulk
+mechanical sweep. Keep spawn counts low; one worker beats three when one can finish it.
+
+Do **not** delegate work you could finish in a handful of tool calls, a modest job split
+into pieces, or — importantly — **review and verification of your own work.** Current
+models already self-check; asking a subagent to double-check produces over-verification
+without improving the result. Independent, risk-gated review of a *diff* by a
+fresh-context reviewer is a different mechanism and still applies (see Review policy) —
+the thing to cut is ad-hoc "go check what I just did".
+
+Once you delegate, commit to it: brief precisely the first time, and don't re-derive a
+worker's findings after it reports. Independent briefs still go out in one message as a
+parallel batch — batching is about *how* to dispatch once you've decided, and that part
+is unchanged.
+
 ## Escalate on evidence, not prestige
 
 Start every task at the lowest lane that could plausibly succeed in one pass. Step up a tier only when a concrete attempt fails or the task demonstrably exceeds the lane's capability — never reach for the expensive tier by default "to be safe."
@@ -117,7 +141,33 @@ Not every diff needs the same review weight. Tier by risk:
 
 ## Effort levels
 
-If your orchestrator model exposes an effort/reasoning-level knob, default to a moderate setting. Drop to a low setting for status/summary/mechanical-dispatch sessions where the orchestrator is mostly routing, not judging. Reserve a high setting for architecture decisions, risk analysis, and final review on hard triggers — raising effort for routine work burns tokens without changing outcomes.
+If your models expose an effort/reasoning knob, treat it as a first-class routing
+dimension alongside model choice — on current top-tier models it moves cost and latency
+more than it moves correctness on routine work.
+
+**Pin it per agent, explicitly.** In most harnesses a subagent's effort *inherits from
+the session* when the frontmatter omits it. A session left at a high setting therefore
+runs every unpinned worker — issue writers, doc writers, log scanners — at the most
+expensive reasoning tier, silently, with nothing in the transcript showing it. This is
+the single easiest cost regression to ship and the hardest to notice. Every agent in
+`harness/agents/` and `plugins/lean-flow/agents/` pins `effort:` for that reason.
+
+Rough shape, adapt to your provider's ladder:
+
+| Work | Effort |
+|---|---|
+| Templated writes, log reduction, file discovery, inventory | lowest |
+| Doc/prose authoring from a packet, most review personas | low-middle |
+| Implementation from a bounded brief; the highest-stakes review personas | middle-high |
+| Architecture, risk analysis, novel debugging, final review on hard triggers | high |
+| Correctness mattering more than cost, on a genuinely hard problem | top |
+
+Two calibration notes. First, **start a class of work at the tier you think it needs and
+then sweep down** — current models hold quality at lower effort far better than their
+predecessors, and defaults carried over from an older model are usually a tier too high.
+Second, **effort is not a verbosity control.** If output is longer than you want, say so
+in the prompt; lowering effort changes how much the model thinks, not how much it writes.
+
 
 ## Output discipline
 

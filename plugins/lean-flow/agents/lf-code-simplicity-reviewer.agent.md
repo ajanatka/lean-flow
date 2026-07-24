@@ -2,6 +2,7 @@
 name: lf-code-simplicity-reviewer
 description: "Ruthlessly reviews code for YAGNI violations and simplification opportunities, questioning the necessity of every line. Dispatch as a final pass after implementation is complete."
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 ---
 

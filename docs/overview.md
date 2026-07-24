@@ -24,7 +24,6 @@ Skills and agents are prompts — a sufficiently distracted or under-pressure mo
 
 - **SessionStart** — `session-git-guard.sh` briefs the session on git ground truth (worktree vs. shared checkout, branch, staleness) before any work starts.
 - **PreToolUse / PostToolUse (Bash)** — `git-ground-truth.sh` blocks unsafe commits/pushes; `git-pin-update.sh` keeps the session's branch pin current after deliberate branch changes; `gh-merge-guard.sh` blocks merging a PR into the wrong base.
-- **UserPromptSubmit** — `model-triage-nudge.sh` nudges the driving model to consider dispatching cheap work instead of doing it inline.
 - **Stop** — `learn-stop-gate.sh` and `docs-freshness-gate.sh` block the first stop attempt after a merged PR that produced no learning doc / no documentation update.
 
 Full behavior and exact wiring: `docs/hooks.md`.
