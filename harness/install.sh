@@ -34,7 +34,7 @@ for arg in "$@"; do
   esac
 done
 
-mkdir -p "$HOOKS_DIR" "$AGENTS_DIR"
+mkdir -p "$HOOKS_DIR"
 
 backed_up=false
 backup_if_exists() {
@@ -61,11 +61,40 @@ for f in "$SCRIPT_DIR"/hooks/*.sh; do
   copy_file "$f" "$HOOKS_DIR"
 done
 
+# Agents ship two ways: as files under ~/.claude/agents (this loop) and, for anyone
+# running an agent plugin, from the plugin itself. A same-named file in ~/.claude/agents
+# SHADOWS the plugin's copy — so a plugin user who runs this installer silently swaps
+# their configured agents for these generic ones. That is a real regression, not a
+# theoretical one: the generic linear-worker has no team/state IDs and the generic
+# docs-writer never deploys the manual.
+#
+# So skip any agent an installed plugin already provides, per file. A user with no
+# plugin gets all of them (the previous behaviour); a plugin user gets none of the
+# conflicting ones and keeps their configured versions.
+plugin_provides() {
+  local name="$1"
+  compgen -G "$CLAUDE_DIR/plugins/cache/*/*/*/agents/$name"        >/dev/null 2>&1 && return 0
+  compgen -G "$CLAUDE_DIR/plugins/marketplaces/*/plugins/*/agents/$name" >/dev/null 2>&1 && return 0
+  return 1
+}
+
 echo "Installing lean-flow harness agents..."
+agents_installed=0
 for f in "$SCRIPT_DIR"/agents/*.md; do
   [ -f "$f" ] || continue
+  name="$(basename "$f")"
+  if plugin_provides "$name"; then
+    echo "  skipped $name (already provided by an installed plugin; a file here would shadow it)"
+    continue
+  fi
+  mkdir -p "$AGENTS_DIR"
   copy_file "$f" "$AGENTS_DIR"
+  agents_installed=$((agents_installed + 1))
 done
+if [ "$agents_installed" -eq 0 ]; then
+  echo "  no agent files installed — your plugin(s) provide them all."
+  rmdir "$AGENTS_DIR" 2>/dev/null || true
+fi
 
 if [ "$with_linear" = true ]; then
   echo "Installing optional Linear hooks..."
