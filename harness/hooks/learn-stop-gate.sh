@@ -51,11 +51,17 @@ def walk(o):
         inp  = o.get("input") or o.get("tool_input") or {}
         if isinstance(inp, dict):
             cmd = inp.get("command") or ""
-            if name == "Bash" and isinstance(cmd, str):
-                # Must be at a COMMAND position, not merely mentioned. `rg "gh pr merge"`
-                # and `git log --grep=` must not count as having merged anything.
+            if name == "Bash" and isinstance(cmd, str) and "<<" not in cmd:
+                # Three filters, because substring matching on transcript text cannot
+                # tell "ran a merge" from "wrote about one", and this gate false-fired
+                # on its own test fixtures:
+                #   1. no heredoc anywhere in the command (commit-message bodies quote
+                #      commands verbatim),
+                #   2. the merge must sit at a COMMAND position, not inside an argument,
+                #   3. that segment must be a CLEAN command — plain args only. Quotes,
+                #      braces and redirects mean the text is embedded in something else.
                 for seg in re.split(r"&&|\|\||;|\n", cmd):
-                    if re.match(r"\s*(?:\w+=\S+\s+)*gh\s+pr\s+merge\b", seg):
+                    if re.match(r"""^\s*(?:\w+=\S+\s+)*gh\s+pr\s+merge(?:\s+[\w./=-]+)*\s*$""", seg):
                         merges += 1
             fp = inp.get("file_path") or ""
             if name in WRITE and isinstance(fp, str):

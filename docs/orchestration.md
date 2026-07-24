@@ -158,9 +158,25 @@ Rough shape, adapt to your provider's ladder:
 |---|---|
 | Templated writes, log reduction, file discovery, inventory | lowest |
 | Doc/prose authoring from a packet, most review personas | low-middle |
-| Implementation from a bounded brief; the highest-stakes review personas | middle-high |
+| Implementation from a bounded brief | middle-high |
 | Architecture, risk analysis, novel debugging, final review on hard triggers | high |
 | Correctness mattering more than cost, on a genuinely hard problem | top |
+
+**Review personas are a special case: tier them by whether they read or reproduce.**
+Effort's most consequential effect on a reviewer is how many tool calls it makes, not how
+hard it thinks about the diff. A persona that reads code and reasons holds its accuracy at
+a low tier on current models. A persona that earns its keep by *constructing a failure* —
+running the thing, measuring the corpus, reproducing in a sandbox — needs the budget, and
+that is where the highest-severity findings actually come from.
+
+So: retrieval and single-question lenses at the lowest tier, reading-based defect finders
+in the middle, and keep exactly one or two reproduction-based lanes high. Nothing in a
+review roster warrants the top tiers — those are the coding/agentic settings.
+
+Keep at least one deep in-family lane even when an out-of-family adversarial pass exists.
+They do not overlap: an out-of-family reviewer sees whatever you hand it and is strong on
+local code defects, while a deep in-family reviewer given the whole system finds the
+design and doctrine failures. Losing either loses a distinct class.
 
 Two calibration notes. First, **start a class of work at the tier you think it needs and
 then sweep down** — current models hold quality at lower effort far better than their

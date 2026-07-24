@@ -2,7 +2,7 @@
 name: lf-agent-native-reviewer
 description: "Reviews code to ensure agent-native parity -- any action a user can take, an agent can also take, with the context to act effectively. Dispatch after adding UI features, agent tools, or system prompts."
 model: sonnet
-effort: medium
+effort: low
 color: blue
 tools: Read, Grep, Glob, Bash
 ---

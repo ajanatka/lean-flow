@@ -2,7 +2,7 @@
 name: lf-scope-guardian-reviewer
 description: "Reviews a planning document for scope alignment and unjustified complexity -- challenges unnecessary abstractions, premature frameworks, and scope creep beyond stated goals. Dispatched by the document-review skill on every plan review."
 model: sonnet
-effort: medium
+effort: low
 tools: Read, Grep, Glob, Bash
 ---
 
