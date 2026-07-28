@@ -81,6 +81,13 @@ CASES = [
     case("commit message quoting a git cmd", EAMESLY,
          "echo 'run git " + "push origin main to ship'", 0),
 
+    # Heredoc bodies are DATA. A commit message quoting git commands was parsed
+    # as if it ran them, refusing the harness exemption and blocking the commit.
+    case("exempt commit, heredoc quotes git", "/tmp",
+         f'R={CLAUDE_DIR}; git ' + '-C "$R" add x && git '
+         + '-C "$R" commit -q -F - <<\'MSG\'\nfix\n\nmentions git '
+         + 'commit -m x and git ' + 'push here\nMSG', 0),
+
     # --- unrelated ---
     case("non-git command", EAMESLY, "ls -la", 0),
 ]

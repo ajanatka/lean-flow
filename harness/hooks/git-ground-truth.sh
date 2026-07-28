@@ -36,6 +36,10 @@ c = sys.argv[1] if len(sys.argv) > 1 else ""
 # Replace with a PLACEHOLDER, not empty: blanking a quoted span destroys
 # argument structure, so `git -C "$R" commit` became `git -C  commit` and the
 # -C option swallowed the subcommand, silently un-matching a real command.
+# Heredoc BODIES are data, not command text. A commit message or PR body that
+# quotes git commands was parsed as if it RAN them, which refused the harness
+# exemption and blocked the commit. Strip them before anything else.
+c = re.sub(r"<<-?\s*['\"]?(\w+)['\"]?\n.*?\n\1\b", " __HEREDOC__ ", c, flags=re.DOTALL)
 c = re.sub(r"'[^']*'", " __Q__ ", c)
 c = re.sub(r'"[^"]*"', " __Q__ ", c)
 print(c)
@@ -119,7 +123,7 @@ fi
 # earlier version counted invocations and blocked it (false positive found
 # immediately in use). Only refuse when the destructive invocations do not all
 # name the same directory, or mix an explicit -C with a bare cwd-relative one.
-MULTI_GIT=$(python3 - "$cmd" <<'PYEOF' 2>/dev/null
+MULTI_GIT=$(python3 - "$cmd_unquoted" <<'PYEOF' 2>/dev/null
 import re, sys
 cmd = sys.argv[1] if len(sys.argv) > 1 else ""
 VERBS = r"(?:commit|push|merge|rebase|reset)"
