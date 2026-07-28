@@ -88,6 +88,16 @@ CASES = [
          + '-C "$R" commit -q -F - <<\'MSG\'\nfix\n\nmentions git '
          + 'commit -m x and git ' + 'push here\nMSG', 0),
 
+    # --- CODEX round 2: override/routing bypasses ---
+    case("R2 override as bare ARG must not grant", EAMESLY,
+         "git " + "commit -m CLAUDE_ALLOW_MAIN=1", 2),
+    case("R2 --no-pager reaches protection", EAMESLY,
+         "git " + "--no-pager commit -m x", 2),
+    case("R2 -c before -C resolves target", "/tmp",
+         f"cd {CLAUDE_DIR} && git " + f"-c commit.gpgsign=false -C {EAMESLY} commit -m x", 2),
+    case("R2 --git-dir routes to protected", "/tmp",
+         f"cd {CLAUDE_DIR} && git " + f"--git-dir={EAMESLY}/.git --work-tree={EAMESLY} commit -m x", 2),
+
     # --- unrelated ---
     case("non-git command", EAMESLY, "ls -la", 0),
 ]

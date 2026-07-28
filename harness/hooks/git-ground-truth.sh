@@ -48,16 +48,19 @@ PYEOF
 [ -z "$cmd_unquoted" ] && cmd_unquoted="$cmd"
 
 has_override() {
-  # $1 = var name; assignment at command start or after a shell separator.
+  # $1 = var name. Must be an ENV ASSIGNMENT in command position — i.e. at the
+  # start of a command, with only other assignments/env between it and `git`.
+  # Matching "anywhere after whitespace" also accepted it as an ARGUMENT, so
+  # `git commit -m CLAUDE_ALLOW_MAIN=1` disabled the guard (adversarial review).
   printf '%s' " $cmd_unquoted" \
-    | grep -qE "(^|[;&|(]|[[:space:]])(env[[:space:]]+|export[[:space:]]+)?$1=1([[:space:]]|$)"
+    | grep -qE "(^|[;&|(])[[:space:]]*((env|export)[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*$1=1[[:space:]]"
 }
 
 # Global options may appear (repeatedly) between `git` and the subcommand.
 # Matching only an optional `-C <dir>` meant `git -c key=val commit` fell
 # through this filter and exited before ANY protection ran — a clean bypass
 # (adversarial review 2026-07-28). Also covers --git-dir / --work-tree / -c.
-echo " $cmd_unquoted" | grep -qE '(^|[;&|(]|[[:space:]])git +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +)*(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || exit 0
+echo " $cmd_unquoted" | grep -qE '(^|[;&|(]|[[:space:]])git +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +|--[a-z-]+ +)*(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || exit 0
 
 session_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))' <<<"$input" 2>/dev/null)
 
@@ -79,7 +82,24 @@ session_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("sessio
 # session cwd. A leading space lets the [^A-Za-z0-9_] guard (against matching
 # e.g. "legit") also work when the command starts with `git`.
 _cd=$(echo "$cmd" | sed -n "s/^[[:space:]]*cd[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&|]*[^\"';&| ]\).*/\1/p" | head -1)
-_gitc=$(echo " $cmd" | sed -n "s/.*[^A-Za-z0-9_]git[[:space:]]\{1,\}-C[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&| ]*\).*/\1/p" | head -1)
+_gitc=$(printf '%s' "$cmd" | python3 - "$cmd" <<'PYEOF' 2>/dev/null
+import re, sys
+c = sys.argv[1] if len(sys.argv) > 1 else ""
+# Global options may appear in any order BEFORE the subcommand, so a fixed
+# "-C immediately after git" pattern missed `git -c k=v -C /repo commit`.
+# --git-dir / --work-tree route the repo too and were ignored entirely.
+m = re.findall(r"(?<![A-Za-z0-9_])git\s+((?:-[cC]\s+\S+\s+|--\S+(?:=\S+)?\s+|--\S+\s+\S+\s+)*)", c)
+best = ""
+for opts in m:
+    for pat in (r"-C\s+(\S+)", r"--git-dir[= ](\S+)", r"--work-tree[= ](\S+)"):
+        f = re.findall(pat, opts)
+        if f:
+            best = f[-1].strip("\"'")
+if best.endswith("/.git"):
+    best = best[:-5]
+print(best)
+PYEOF
+)
 
 expand_path() {
   _p="$1"
@@ -300,7 +320,7 @@ fi
 # Previously narrower, so `git -c key=val commit` passed the matcher, resolved
 # the repo correctly, then fell through to ground-truth injection instead of
 # being blocked (adversarial review 2026-07-28).
-if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +)*(commit|push)\b' \
+if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +|--[a-z-]+ +)*(commit|push)\b' \
    && ! echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?push +[^;&|]*(--delete|:[^ ])'; then
   # 0. Override budget: CLAUDE_ALLOW_* / CLAUDE_REPIN are for RARE deliberate
   # exceptions. Cap at 3 uses per session; beyond that, only an explicit,
