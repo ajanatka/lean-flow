@@ -29,14 +29,18 @@ COMMIT = "git " + "commit -m x"
 PUSH = "git " + "push origin main"
 
 
-def case(label, cwd, command, want):
-    return (label, cwd, command, want)
+def case(label, cwd, command, want, reason=None):
+    # `reason`: substring that must appear in stderr when blocking. Without it
+    # a block-case can pass via the WRONG rule (e.g. the shared-checkout block
+    # firing where the default-branch block was meant) — Codex round-2 P2.
+    return (label, cwd, command, want, reason)
 
 
 CASES = [
     # --- must still block: the protected code repo, default branch ---
-    case("eamesly main, plain", EAMESLY, COMMIT, 2),
-    case("eamesly main, -C literal", EAMESLY, f"git " + f"-C {EAMESLY} commit -m x", 2),
+    case("eamesly main, plain", EAMESLY, COMMIT, 2, reason="default branch"),
+    case("eamesly main, -C literal", EAMESLY, f"git " + f"-C {EAMESLY} commit -m x", 2,
+         reason="default branch"),
     case("ANTI-BYPASS eamesly via -C $VAR", "/tmp",
          f'R={EAMESLY}; git ' + '-C "$R" commit -m x', 2),
     case("eamesly main push", EAMESLY, PUSH, 2),
@@ -124,7 +128,7 @@ def reset_state() -> None:
 def main() -> int:
     reset_state()
     fails = 0
-    for label, cwd, command, want in CASES:
+    for label, cwd, command, want, reason in CASES:
         # The hook resolves an unqualified command against its OWN process cwd,
         # NOT the payload's "cwd" field — so the subprocess cwd is what makes
         # the no-`-C` cases meaningful. Passing it only in JSON made those two
@@ -138,11 +142,16 @@ def main() -> int:
             capture_output=True, text=True, cwd=cwd,
         )
         ok = proc.returncode == want
+        if ok and reason is not None and reason not in proc.stderr:
+            ok = False  # blocked, but by the wrong rule
         fails += 0 if ok else 1
         print(f"{'PASS' if ok else 'FAIL'} rc={proc.returncode} want={want} :: {label}")
         if not ok:
             print(f"      stderr: {proc.stderr.strip()[:200]}")
 
+    # The suite consumes a REAL persistent budget file under the test session
+    # id; leaving it behind pollutes state (Codex round-2 P2).
+    reset_state()
     print("\nRESULT:", "ALL PASS" if fails == 0 else f"{fails} FAILURES")
     return 1 if fails else 0
 
