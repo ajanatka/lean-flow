@@ -15,23 +15,142 @@
 # git-pin-update.sh (PostToolUse on checkout/switch/worktree).
 
 input=$(cat)
+
+# Cheap pre-filter before spawning a Python interpreter: this hook fires on every
+# Bash call but only acts on state-changing git commands. Deliberate superset of
+# the precise check below — a false positive falls through, so behavior is
+# unchanged and only the interpreter start is skipped.
+grep -q 'git' <<<"$input" || exit 0
+
 cmd=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' <<<"$input" 2>/dev/null)
-echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || exit 0
+
+# Strip quoted spans BEFORE deciding whether this is even a git command.
+# `gh pr create --body "...git commit..."` is not a git command, but matching
+# raw text made the guard block writing PR descriptions and commit messages
+# ABOUT git — the same self-reference trap the pooler guard hit. Known limit:
+# a genuine `bash -c "git commit"` is also hidden; that wrapping is rare from
+# agents, and the alternative (blocking all prose about git) is worse.
+cmd_unquoted=$(python3 - "$cmd" <<'PYEOF' 2>/dev/null
+import re, sys
+c = sys.argv[1] if len(sys.argv) > 1 else ""
+# Replace with a PLACEHOLDER, not empty: blanking a quoted span destroys
+# argument structure, so `git -C "$R" commit` became `git -C  commit` and the
+# -C option swallowed the subcommand, silently un-matching a real command.
+c = re.sub(r"'[^']*'", " __Q__ ", c)
+c = re.sub(r'"[^"]*"', " __Q__ ", c)
+print(c)
+PYEOF
+)
+[ -z "$cmd_unquoted" ] && cmd_unquoted="$cmd"
+
+has_override() {
+  # $1 = var name; assignment at command start or after a shell separator.
+  printf '%s' " $cmd_unquoted" \
+    | grep -qE "(^|[;&|(]|[[:space:]])(env[[:space:]]+|export[[:space:]]+)?$1=1([[:space:]]|$)"
+}
+
+# Global options may appear (repeatedly) between `git` and the subcommand.
+# Matching only an optional `-C <dir>` meant `git -c key=val commit` fell
+# through this filter and exited before ANY protection ran — a clean bypass
+# (adversarial review 2026-07-28). Also covers --git-dir / --work-tree / -c.
+echo " $cmd_unquoted" | grep -qE '(^|[;&|(]|[[:space:]])git +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +)*(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || exit 0
 
 session_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))' <<<"$input" 2>/dev/null)
 
-# Resolve the directory the git command will actually run in: a leading
-# `cd <dir> && ...` or a `git -C <dir>`, else the session cwd.
-wd=$(echo "$cmd" | sed -n "s/^[[:space:]]*cd[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&|]*[^\"';&| ]\).*/\1/p" | head -1)
-[ -z "$wd" ] && wd=$(echo "$cmd" | sed -n "s/.*\bgit[[:space:]]\{1,\}-C[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&| ]*\).*/\1/p" | head -1)
-case "$wd" in "~"*) wd="$HOME${wd#\~}";; esac
+
+# Resolve the directory the git command will actually run in.
+#
+# ORDER IS SECURITY-CRITICAL. `git -C <dir>` sets git's own working directory,
+# so it BEATS a leading `cd`. The previous version only consulted -C when no cd
+# was present, which made this a straight bypass of the protected repo:
+#
+#     cd <exempt-dir> && git -C <protected-repo> commit -m x
+#
+# resolved to the exempt dir, hit the exemption, and exited 0. Found by
+# adversarial review 2026-07-28. An ABSOLUTE -C ignores the cd entirely; a
+# RELATIVE -C resolves against it, matching real git semantics.
+#
+# NOTE on the sed: `\b` is a GNU extension unsupported by macOS BSD sed — with
+# it these expressions silently matched nothing and every -C fell back to the
+# session cwd. A leading space lets the [^A-Za-z0-9_] guard (against matching
+# e.g. "legit") also work when the command starts with `git`.
+_cd=$(echo "$cmd" | sed -n "s/^[[:space:]]*cd[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&|]*[^\"';&| ]\).*/\1/p" | head -1)
+_gitc=$(echo " $cmd" | sed -n "s/.*[^A-Za-z0-9_]git[[:space:]]\{1,\}-C[[:space:]]\{1,\}[\"']\{0,1\}\([^\"';&| ]*\).*/\1/p" | head -1)
+
+expand_path() {
+  _p="$1"
+  case "$_p" in "~"*) _p="$HOME${_p#\~}";; esac
+  # `git -C "$VAR"` is the normal shape for multi-repo commands; resolve a
+  # simple VAR=<path> assignment from the same command line, else the literal
+  # `$VAR` fails the -d test and silently falls back to the session cwd.
+  case "$_p" in
+    *'$'*)
+      _v=$(printf '%s' "$_p" | sed -n 's/.*\${\{0,1\}\([A-Za-z_][A-Za-z0-9_]*\)}\{0,1\}.*/\1/p')
+      if [ -n "$_v" ]; then
+        _val=$(printf '%s' "$cmd" \
+          | sed -n "s/.*[;&[:space:]]\{0,1\}${_v}=[\"']\{0,1\}\([^\"';&| ]*\).*/\1/p" | head -1)
+        case "$_val" in "~"*) _val="$HOME${_val#\~}";; esac
+        [ -n "$_val" ] && _p="$_val"
+      fi
+      ;;
+  esac
+  printf '%s' "$_p"
+}
+
+_cd=$(expand_path "$_cd")
+_gitc=$(expand_path "$_gitc")
+
+if [ -n "$_gitc" ]; then
+  case "$_gitc" in
+    /*) wd="$_gitc" ;;                 # absolute -C wins outright
+    *)  wd="${_cd:-.}/$_gitc" ;;       # relative -C resolves against the cd
+  esac
+else
+  wd="$_cd"
+fi
+
+# Fail closed on compound commands carrying more than one DESTRUCTIVE git
+# invocation: the greedy expressions above can only resolve one target, so a
+# mixed `git -C <protected> commit && git -C <exempt> commit` would be judged
+# by whichever matched. When we cannot be sure, refuse the exemption and
+# evaluate under the normal policy.
+# Ambiguity is about DIFFERENT targets, not about count. `add && commit &&
+# pull && push` against one repo is the normal shape and must stay exempt; an
+# earlier version counted invocations and blocked it (false positive found
+# immediately in use). Only refuse when the destructive invocations do not all
+# name the same directory, or mix an explicit -C with a bare cwd-relative one.
+MULTI_GIT=$(python3 - "$cmd" <<'PYEOF' 2>/dev/null
+import re, sys
+cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+VERBS = r"(?:commit|push|merge|rebase|reset)"
+# each destructive git invocation, with its -C target if present
+inv = re.findall(
+    rf"(?<![A-Za-z0-9_])git\s+((?:-[cC]\s+\S+\s+|--\S+(?:=\S+)?\s+)*){VERBS}\b",
+    cmd)
+targets, bare = set(), 0
+for opts in inv:
+    m = re.findall(r"-C\s+(\S+)", opts)
+    if m:
+        targets.add(m[-1].strip("\"'"))
+    else:
+        bare += 1
+ambiguous = len(targets) > 1 or (targets and bare)
+print("1" if ambiguous else "0")
+PYEOF
+)
+[ -z "$MULTI_GIT" ] && MULTI_GIT=0
+
 [ -n "$wd" ] && [ -d "$wd" ] || wd="."
 
 branch=$(git -C "$wd" rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
 top=$(git -C "$wd" rev-parse --show-toplevel 2>/dev/null)
 gitdir=$(git -C "$wd" rev-parse --absolute-git-dir 2>/dev/null)
 common=$(git -C "$wd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
-default=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')
+# MUST be queried from the TARGET repo. Without -C this read the default branch
+# of whatever repo the hook's own cwd sat in, so a target whose default is
+# `master` was compared against `main` and neither block fired (adversarial
+# review 2026-07-28).
+default=$(git -C "$wd" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|.*/||')
 default=${default:-main}
 
 # Harness repo exemption: the Claude Code config dir (~/.claude) is commonly
@@ -39,9 +158,19 @@ default=${default:-main}
 # worktrees). The worktree/main policy is for code repos; it does not fit
 # this one. Adjust or remove this block if your harness repo is set up
 # differently.
-if [ "$top" = "$HOME/.claude" ]; then
-  echo "[git-ground-truth] harness repo ($top) — direct-to-main sync by design; guard exempt."
-  exit 0
+# Covers ~/.claude itself AND the separate git repos nested under it (plugin
+# marketplaces such as plugins/marketplaces/hano-agents). Those are
+# direct-to-main by design like the harness repo, and are NOT the code repos
+# this worktree/main policy exists to protect. Owner-confirmed 2026-07-28.
+if [ "${MULTI_GIT:-0}" = "1" ]; then
+  echo "[git-ground-truth] multiple destructive git invocations in one command — exemption refused (cannot prove which repo each targets)."
+else
+case "$top" in
+  "$HOME/.claude" | "$HOME/.claude"/*)
+    echo "[git-ground-truth] harness/plugin repo ($top) — direct-to-main by design; guard exempt."
+    exit 0
+    ;;
+esac
 fi
 
 # Docs-only detection: commits/pushes whose entire file set is under docs/**
@@ -163,7 +292,11 @@ fi
 
 # Remote-branch deletion (git push --delete / push origin :ref) is not a push
 # OF the current branch — exempt from the commit/push rules below.
-if echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(commit|push)\b' \
+# Must accept the SAME global-option prefix as the trigger matcher above.
+# Previously narrower, so `git -c key=val commit` passed the matcher, resolved
+# the repo correctly, then fell through to ground-truth injection instead of
+# being blocked (adversarial review 2026-07-28).
+if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +)*(commit|push)\b' \
    && ! echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?push +[^;&|]*(--delete|:[^ ])'; then
   # 0. Override budget: CLAUDE_ALLOW_* / CLAUDE_REPIN are for RARE deliberate
   # exceptions. Cap at 3 uses per session; beyond that, only an explicit,
@@ -174,7 +307,7 @@ if echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(commit|push)\b' \
   if [ "$docs_only" = true ] && echo "$cmd" | grep -qE 'CLAUDE_(ALLOW_MAIN|ALLOW_SHARED_CHECKOUT)=1'; then
     echo "[git-guard] docs-only exemption (standing policy, configurable): budget not consumed"
   elif echo "$cmd" | grep -qE 'CLAUDE_(ALLOW_MAIN|ALLOW_SHARED_CHECKOUT|REPIN)=1' \
-     && ! echo "$cmd" | grep -q 'CLAUDE_USER_APPROVED=1' && [ -n "$session_id" ]; then
+     && ! has_override CLAUDE_USER_APPROVED && [ -n "$session_id" ]; then
     budget_file="$HOME/.claude/state/git-session-pins/$session_id.overrides"
     used=$(grep -c '' "$budget_file" 2>/dev/null)
     used=${used:-0}
@@ -186,7 +319,7 @@ if echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(commit|push)\b' \
     echo "[git-guard] override $((used + 1))/3 used this session (budget resets per session; beyond 3 requires the repo owner's explicit approval)."
   fi
   # 1. Default-branch commits
-  if [ "$branch" = "$default" ] && ! echo "$cmd" | grep -q 'CLAUDE_ALLOW_MAIN=1'; then
+  if [ "$branch" = "$default" ] && ! has_override CLAUDE_ALLOW_MAIN; then
     echo "BLOCKED: git commit/push on default branch '$default' in $top. Branch first (ideally in an isolated worktree), or prefix the command with CLAUDE_ALLOW_MAIN=1 for a deliberate main commit." >&2
     exit 2
   fi
@@ -200,11 +333,11 @@ if echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(commit|push)\b' \
   # 3. Session branch-pin drift
   if [ -n "$session_id" ] && [ -f "$HOME/.claude/state/git-session-pins/$session_id" ]; then
     pinned=$(grep "^$top	" "$HOME/.claude/state/git-session-pins/$session_id" | cut -f2 | tail -1)
-    if [ -n "$pinned" ] && [ "$pinned" != "$branch" ] && ! echo "$cmd" | grep -q 'CLAUDE_REPIN=1'; then
+    if [ -n "$pinned" ] && [ "$pinned" != "$branch" ] && ! has_override CLAUDE_REPIN; then
       echo "BLOCKED: branch drift — this session pinned '$pinned' for $top but HEAD is now '$branch'. Another session/CLI may have switched branches underneath you. Verify with 'git log -3 --oneline' + 'git status' that '$branch' is where this work belongs. If yes, re-pin by prefixing the command with CLAUDE_REPIN=1; if not, 'git switch $pinned' first." >&2
       exit 2
     fi
-    if echo "$cmd" | grep -q 'CLAUDE_REPIN=1'; then
+    if has_override CLAUDE_REPIN; then
       pinfile="$HOME/.claude/state/git-session-pins/$session_id"
       { grep -v "^$top	" "$pinfile" 2>/dev/null; printf '%s\t%s\n' "$top" "$branch"; } > "$pinfile.tmp" && mv "$pinfile.tmp" "$pinfile"
     fi
