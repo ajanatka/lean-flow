@@ -56,7 +56,11 @@ copy_file() {
 }
 
 echo "Installing lean-flow harness core hooks..."
-for f in "$SCRIPT_DIR"/hooks/*.sh; do
+# *.py first: helper scripts the hooks shell out to (e.g. stop-gate-scan.py,
+# the shared incremental transcript scanner behind the two Stop gates). Helpers
+# install BEFORE their consumers so an interrupted install never leaves a shell
+# hook pointing at a missing helper.
+for f in "$SCRIPT_DIR"/hooks/*.py "$SCRIPT_DIR"/hooks/*.sh; do
   [ -f "$f" ] || continue
   copy_file "$f" "$HOOKS_DIR"
 done

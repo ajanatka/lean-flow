@@ -78,10 +78,18 @@ for n in nodes:
     labels = ",".join(clean(l.get("name")) for l in (n.get("labels") or {}).get("nodes", [])) or "-"
     rows.append("\t".join([ident, state, title, proj, labels]))
 tsv = os.environ["LINEAR_TSV"]
-tmp = tsv + ".tmp"
-with open(tmp, "w") as f:
-    f.write("\n".join(rows) + ("\n" if rows else ""))
-os.replace(tmp, tsv)
+# Process-unique temp name: concurrent refreshes (e.g. two sessions starting
+# at once, or a background refresh racing a first-run synchronous one) must
+# not interleave writes into one temp file. Each writes its own and the
+# atomic replace makes last-writer-wins — both writers hold complete data.
+tmp = f"{tsv}.tmp.{os.getpid()}"
+try:
+    with open(tmp, "w") as f:
+        f.write("\n".join(rows) + ("\n" if rows else ""))
+    os.replace(tmp, tsv)
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
 with open(os.environ["LINEAR_META"], "w") as f:
     f.write(f"count={len(rows)}\n")
 PY
