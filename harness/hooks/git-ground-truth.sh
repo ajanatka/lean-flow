@@ -182,8 +182,9 @@ default=${default:-main}
 # worktrees). The worktree/main policy is for code repos; it does not fit
 # this one. Adjust or remove this block if your harness repo is set up
 # differently.
-# Covers ~/.claude itself AND the separate git repos nested under it (plugin
-# marketplaces such as plugins/marketplaces/hano-agents). Those are
+# Covers ~/.claude itself AND the separate git repos nested under it (e.g.
+# plugin marketplaces such as a private org agents plugin under
+# plugins/marketplaces/). Those are
 # direct-to-main by design like the harness repo, and are NOT the code repos
 # this worktree/main policy exists to protect. Owner-confirmed 2026-07-28.
 if [ "${MULTI_GIT:-0}" = "1" ]; then
