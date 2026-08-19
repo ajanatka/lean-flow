@@ -1,0 +1,22 @@
+# Denylist of org-identifying strings that must never appear in this
+# public repo (github.com/ajanatka/lean-flow).
+#
+# lean-flow is public. Hano/eamesly-specific content (product code,
+# infrastructure identifiers, internal docs, workflow agents tuned to
+# that org) belongs in the private eamesly/hano-agents repo, not here.
+# If you're adding something that trips this list, move it there
+# instead of editing the list to let it through.
+#
+# One extended-regex (grep -E) pattern per line. This file itself is
+# excluded from the scan it powers (see
+# .github/workflows/hano-tripwire.yml), so it is safe to name the
+# protected strings here even though the workflow forbids them
+# everywhere else.
+withhano
+eamesly
+\bhano\b
+945a36ad-74fa-4232-9e5c-bac9929d70f8
+4687628
+4689798
+admin\.withhano
+skmbijedhmbkaqdbusjq
