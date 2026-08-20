@@ -1,0 +1,31 @@
+name: Org content tripwire
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  org-content-tripwire:
+    name: org-content-tripwire
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate cross-client agent generation
+        run: python3 -m unittest tests.test_codex_adapter -q
+
+      - name: Validate git safety guard
+        run: python3 harness/hooks/tests/test_git_ground_truth.py
