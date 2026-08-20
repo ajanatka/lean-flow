@@ -77,9 +77,9 @@ def _parse_scalar(value: str) -> str:
     return value
 
 
-def parse_prompt(path: Path) -> tuple[dict[str, str], str]:
+def _parse_prompt_bytes(path: Path, content: bytes) -> tuple[dict[str, str], str]:
     """Parse the flat YAML frontmatter subset used by canonical prompts."""
-    text = path.read_text(encoding="utf-8")
+    text = content.decode("utf-8")
     if not text.startswith("---\n"):
         raise ValueError(f"{path}: missing YAML frontmatter")
     try:
@@ -104,6 +104,10 @@ def parse_prompt(path: Path) -> tuple[dict[str, str], str]:
     return fields, body
 
 
+def parse_prompt(path: Path) -> tuple[dict[str, str], str]:
+    return _parse_prompt_bytes(path, path.read_bytes())
+
+
 def _persona_tool_classes(tools: str) -> tuple[str, ...]:
     classes = {"read", "search"}
     if "Bash" in tools:
@@ -113,10 +117,6 @@ def _persona_tool_classes(tools: str) -> tuple[str, ...]:
     if "ToolSearch" in tools:
         classes.add("tool-discovery")
     return tuple(sorted(classes))
-
-
-def _source_hash(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def validate_canonical_layout(root: Path) -> None:
@@ -149,7 +149,8 @@ def build_catalog(root: Path) -> list[Agent]:
 
     persona_dir = root / "plugins" / "lean-flow" / "agents"
     for path in sorted(persona_dir.glob("*.agent.md")):
-        fields, body = parse_prompt(path)
+        content = path.read_bytes()
+        fields, body = _parse_prompt_bytes(path, content)
         name = fields["name"]
         if not name.startswith("lf-"):
             raise ValueError(f"{path}: persona name must use lf- namespace")
@@ -160,7 +161,7 @@ def build_catalog(root: Path) -> list[Agent]:
                 description=fields["description"],
                 instructions=body,
                 source=path.relative_to(root).as_posix(),
-                source_sha256=_source_hash(path),
+                source_sha256=hashlib.sha256(content).hexdigest(),
                 source_kind="persona",
                 claude_model=fields["model"],
                 semantic_tier=SEMANTIC_TIER_MAP[fields["model"]],
@@ -173,7 +174,8 @@ def build_catalog(root: Path) -> list[Agent]:
 
     lane_dir = root / "harness" / "agents"
     for path in sorted(lane_dir.glob("*.md")):
-        fields, body = parse_prompt(path)
+        content = path.read_bytes()
+        fields, body = _parse_prompt_bytes(path, content)
         claude_name = fields["name"]
         try:
             codex_name = LANE_NAMES[claude_name]
@@ -187,7 +189,7 @@ def build_catalog(root: Path) -> list[Agent]:
                 description=fields["description"],
                 instructions=body,
                 source=path.relative_to(root).as_posix(),
-                source_sha256=_source_hash(path),
+                source_sha256=hashlib.sha256(content).hexdigest(),
                 source_kind="lane",
                 claude_model=fields["model"],
                 semantic_tier=SEMANTIC_TIER_MAP[fields["model"]],
@@ -280,19 +282,11 @@ def desired_files(root: Path) -> dict[Path, bytes]:
     return files
 
 
-def _is_within(path: Path, parent: Path) -> bool:
-    try:
-        path.relative_to(parent)
-        return True
-    except ValueError:
-        return False
-
-
 def validate_output_target(output: Path) -> Path:
     output = output.expanduser().resolve()
     home = Path.home().resolve()
     for live_home in (home / ".claude", home / ".codex"):
-        if _is_within(output, live_home):
+        if output.is_relative_to(live_home):
             raise ValueError(
                 f"refusing live runtime target {output}; generate in a disposable directory and install explicitly"
             )
