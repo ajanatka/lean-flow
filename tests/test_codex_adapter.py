@@ -153,6 +153,30 @@ class CodexAdapterContractTest(unittest.TestCase):
                         findings.append(f"{path} contains {identifier}")
             self.assertEqual([], findings)
 
+    def test_generated_instructions_do_not_bind_to_claude_runtime_tools(self) -> None:
+        forbidden = (
+            "ToolSearch",
+            "Skill tool",
+            "mcp__plugin_",
+            "CLAUDE_ALLOW_",
+            "/Users/andrew",
+        )
+        with tempfile.TemporaryDirectory() as output:
+            subprocess.run(
+                [sys.executable, str(GENERATOR), "--output", output],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            findings = []
+            for path in sorted((Path(output) / "agents" / "lean-flow").glob("*.toml")):
+                instructions = tomllib.loads(path.read_text(encoding="utf-8"))["developer_instructions"]
+                for marker in forbidden:
+                    if marker in instructions:
+                        findings.append(f"{path.name} contains {marker}")
+            self.assertEqual([], findings)
+
     def test_skills_use_portable_references_and_current_model_tiers(self) -> None:
         skill_text = "\n".join(
             path.read_text(encoding="utf-8")

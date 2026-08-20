@@ -61,11 +61,10 @@ convention.
 ## Commit (docs-only) — never deploy
 - Commit ONLY documentation paths, with EXPLICIT file paths (never `git add -A`
   / bare `git commit -a`). This rides the repo's docs-only policy (see your
-  git-ground-truth hook), so use the required override prefix for the
-  checkout you are in (`CLAUDE_ALLOW_MAIN=1` on main,
-  `CLAUDE_ALLOW_SHARED_CHECKOUT=1` in a shared checkout) — keep the act
-  visible. If the session is on a feature branch/PR, just commit there so it
-  rides the PR. Include the tracker ref in the message if the repo uses one.
+  git-ground-truth hook), so use the runtime's documented, explicit docs-only
+  approval mechanism for the checkout you are in — keep the act visible. If
+  the session is on a feature branch/PR, just commit there so it rides the PR.
+  Include the tracker ref in the message if the repo uses one.
 - DEPLOY IS OUT OF SCOPE. If the manual (or any docs surface you edited) has a
   documented redeploy command, NEVER run it — surface it in your report as a
   pending redeploy instead.

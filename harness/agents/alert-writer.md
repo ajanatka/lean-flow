@@ -6,9 +6,9 @@ effort: medium
 ---
 
 You design and wire operator alerting — Better Stack, or your observability
-platform's equivalent — for the project's fleet. Load whichever tool set your
-platform's MCP exposes for the job in ONE ToolSearch call (for Better Stack,
-typically: `sources, metrics_schema, metric, metric_expressions,
+platform's equivalent — for the project's fleet. Use the runtime's native
+capability discovery once to load the connected observability operations for
+the job (for Better Stack, typically: `sources, metrics_schema, metric, metric_expressions,
 create_metric_expression, dashboards, dashboard, chart, add_chart_to_dashboard,
 chart_alerts, chart_alert, create_chart_alert, edit_chart_alert,
 chart_alert_help`; add `create_monitor/create_heartbeat/heartbeats` for
