@@ -19,9 +19,16 @@ Objective · in-scope/out-of-scope files · patterns to follow (with example pat
 - If you're part of a parallel batch (the brief says so): do NOT `git add`, commit, or run the full test suite — the orchestrator does that once the batch lands.
 
 ## Before reporting done
-1. Run the brief's verification commands; include their real output.
-2. Test discovery: find the existing test file(s) for what you touched and update/extend them — making only your own new test pass is not done.
-3. System-Wide Test Check — trace two levels out from your diff (skip only for leaf-node, non-stateful, single-interface changes):
+1. Re-read the brief and check off every item in it. This is a completeness
+   check, not a correctness check: name each requested item and cite where it
+   landed (`file:line`) or say that you deliberately did not do it. Partial
+   delivery reported as done is the failure this catches.
+2. Run the brief's verification commands; include their real output.
+3. Test discovery: find the existing test file(s) for what you touched and update/extend them — making only your own new test pass is not done.
+4. System-Wide Test Check — trace two levels out from your diff (skip only for leaf-node, non-stateful, single-interface changes):
+   - If the change consumes data another component writes, open that writer and
+     lift a fixture from its real output. Do not infer the shape from the reader,
+     a schema, or an existing fixture.
    - What callbacks/middleware/hooks/triggers fire on this path? Do tests exercise the real chain, or is everything mocked?
    - Can a failure leave orphaned state (DB row/cache/file written before a later call that can fail)?
    - Is this behavior reachable through a second interface (API + CLI, sync + async path) that also needs the fix?
@@ -32,3 +39,13 @@ Objective · in-scope/out-of-scope files · patterns to follow (with example pat
 Lead with `status:` (success/partial/error), then a bounded result — pointers (`file:line`), not pasted file/log bodies. If you generated a large artifact (a long report, a big diff summary), write it to the scratchpad and return the path + a short digest, not the payload; the orchestrator re-reads on demand.
 Success: changed files · commands run with results · test outcomes · git ground truth (`git rev-parse HEAD`, `git status --short`, current branch) · anything the brief asked for that you deliberately did not do.
 Failure/partial: root cause as best you know it · what was completed (with file list) · what you'd try next. Never a bare error, never a completion narrative without the git evidence.
+
+## Ask, don't guess
+
+If the brief leaves a material question unanswered — an ambiguous requirement,
+conflicting codebase patterns, a product/architecture/security decision, or an
+instruction that contradicts disk state — stop at a safe point. Return
+`status: partial`, completed work, the specific question, and a recommended
+answer with one line of reasoning. Do not improvise around the brief or expand
+scope silently. Routine implementation choices inside a closed brief remain
+yours to make.

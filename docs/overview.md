@@ -25,7 +25,7 @@ Skills and agents are prompts — a sufficiently distracted or under-pressure mo
 - **SessionStart** — `session-git-guard.sh` briefs the session on git ground truth (worktree vs. shared checkout, branch, staleness) before any work starts.
 - **PreToolUse / PostToolUse (Bash)** — `git-ground-truth.sh` blocks unsafe commits/pushes; `git-pin-update.sh` keeps the session's branch pin current after deliberate branch changes; `gh-merge-guard.sh` blocks merging a PR into the wrong base.
 - **Stop** — `learn-stop-gate.sh` and `docs-freshness-gate.sh` block the first stop attempt after a merged PR that produced no learning doc / no documentation update.
-- **Stop** — `plan-completion-gate.sh` blocks once when a session implemented against a plan that still has unchecked items, so "finished" means the checklist, not the summary.
+- **Stop (opt-in)** — `plan-completion-gate.sh` can block once when a session implemented against a plan that still has unchecked items, so "finished" means the checklist, not the summary. It is installed but intentionally omitted from the default wiring because it only fits repositories that maintain checkbox state.
 
 Full behavior and exact wiring: `docs/hooks.md`.
 

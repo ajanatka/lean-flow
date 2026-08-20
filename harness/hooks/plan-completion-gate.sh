@@ -127,6 +127,6 @@ Before stopping, do one of these — do not just summarise and stop:
      now, with tool calls rather than a description of what is left.
   3. Say plainly what you are leaving and why. Out-of-scope for this session,
      blocked on a decision, deferred by agreement — state which, per item.
-     Scaling the work down is Andrew's call, not yours; expanding it is not.
+     Scaling the work down is the user's call, not yours; expanding it is not.
 EOF
 exit 2

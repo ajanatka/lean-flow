@@ -2,9 +2,9 @@
 
 15 reviewer personas selected by risk tier, plus LF-specific agents that stay always-on. The orchestrator uses this catalog to select which reviewers to spawn for each review.
 
-## Hard-trigger reviewers (2 personas, opus)
+## Hard-trigger reviewers (2 personas, frontier tier)
 
-On a hard-trigger diff (schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind), the persona team is exactly these two, both `model: "opus"`. No other persona joins the team on a hard-trigger diff. The Codex adversarial pass is the third leg of the trio, run outside this skill as R2.
+On a hard-trigger diff (schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind), the persona team is exactly these two on the platform's frontier tier: Claude Code uses Opus and Codex uses GPT-5.6 Sol. No other persona joins the team on a hard-trigger diff. An optional out-of-family adversarial pass is the third leg of the trio and runs outside this skill as R2.
 
 | Persona | Agent | Role |
 |---------|-------|------|
@@ -52,7 +52,7 @@ Spawned on every review regardless of diff content or risk tier -- these are pip
 ## Selection rules
 
 1. **Always spawn the 2 LF always-on agents.** They are independent of risk tier and persona budget.
-2. **On a hard-trigger diff, spawn exactly the 2 hard-trigger reviewers** (`correctness` + whichever of `security`/`adversarial` fits), both on opus. No other persona joins.
+2. **On a hard-trigger diff, spawn exactly the 2 hard-trigger reviewers** (`correctness` + whichever of `security`/`adversarial` fits), both on the frontier semantic tier (Claude Code: Opus; Codex: GPT-5.6 Sol). No other persona joins.
 3. **Otherwise, pick 0-2 personas** from the driver-picked catalog by diff domain. This is a judgment call, not a keyword match. Zero is a valid, expected choice for small, low-risk diffs.
 4. **For the stack-specific personas**, use file types and changed patterns as a starting point, then decide whether the diff actually introduces meaningful work for that reviewer -- and count the pick against the same 0-2 budget. Do not spawn language-specific reviewers just because one config or generated file happens to match the extension.
 5. **Announce the team** before spawning with a one-line justification per persona selected.

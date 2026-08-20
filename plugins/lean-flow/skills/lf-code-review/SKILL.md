@@ -192,7 +192,7 @@ gh pr view <number-or-url> --json state,title,body,files
 Apply skip rules in order:
 
 - `state` is `CLOSED` or `MERGED` -> stop with message `PR is closed/merged; not reviewing.`
-- **Trivial-PR judgment**: spawn a lightweight sub-agent (use `model: haiku` in Claude Code; gpt-5.4-nano or equivalent in Codex) with the PR title, body, and changed file paths. The agent's task: "Is this an automated or trivial PR that does not warrant a code review? Consider: dependency lock-file or manifest-only bumps, automated release commits, chore version increments with no substantive code changes. When in doubt, answer no — false negatives (skipped reviews that should have run) are more costly than false positives (unnecessary reviews)." If the judgment returns yes: stop with message `PR appears to be a trivial automated PR; not reviewing. Run without a PR argument to review the current branch, or pass base:<ref> if review is intended.`
+- **Trivial-PR judgment**: spawn a fast-tier sub-agent (Claude Code: Haiku; Codex: GPT-5.6 Luna) with the PR title, body, and changed file paths. The agent's task: "Is this an automated or trivial PR that does not warrant a code review? Consider: dependency lock-file or manifest-only bumps, automated release commits, chore version increments with no substantive code changes. When in doubt, answer no — false negatives (skipped reviews that should have run) are more costly than false positives (unnecessary reviews)." If the judgment returns yes: stop with message `PR appears to be a trivial automated PR; not reviewing. Run without a PR argument to review the current branch, or pass base:<ref> if review is intended.`
 
 When any skip rule fires, emit the message and stop without dispatching reviewers, switching the checkout, or running scope detection. **Standalone branch mode and `base:` mode are unaffected** -- they always run the full review. **Draft PRs are reviewed normally** -- draft status is not a skip condition; early feedback on in-progress work is valuable.
 
@@ -392,13 +392,13 @@ Pass the resulting path list to the `project-standards` persona inside a `<stand
 
 #### Model tiering
 
-Review execution is Sonnet by default. Every persona sub-agent and LF agent runs on the platform's mid-tier model, regardless of the session's driving model, unless the hard-trigger escalation below applies to it. In Claude Code, pass `model: "sonnet"` in the Agent tool call. On other platforms, use the equivalent mid-tier (e.g., `gpt-5.4-mini` in Codex as of April 2026). If the platform has no model override mechanism or the available model names are unknown, omit the model parameter and let agents inherit the default -- a working review on the parent model is better than a broken dispatch from an unrecognized model name.
+Review execution uses the balanced semantic tier by default. Every persona sub-agent and LF agent runs on that tier regardless of the session's driving model, unless the hard-trigger escalation below applies. In Claude Code, pass `model: "sonnet"`; in Codex, route to `gpt-5.6-terra`. If the platform has no model override mechanism or the available model names are unknown, omit the model parameter and let agents inherit the default -- a working review on the parent model is better than a broken dispatch from an unrecognized model name.
 
 Under a Fable orchestrator this is intentional: Fable's role is orchestration and validation -- intent discovery, reviewer selection, finding merge/dedup, and synthesis -- never review execution itself. No persona sub-agent inherits the Fable (or Opus) session model; model choice for a persona is always explicit -- sonnet by default, opus only for the two named reviewers on the hard-trigger paragraph below. Capability at the orchestrator layer does not otherwise extend to the reviewers it dispatches.
 
 The orchestrator (this skill) inherits the session model; it handles intent discovery, reviewer selection, finding merge/dedup, and synthesis -- tasks that benefit from the same reasoning capability the user configured.
 
-**Hard-trigger escalation (conditional).** When the diff hits a hard trigger -- schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind -- the persona team is exactly `lf-correctness-reviewer` plus whichever of `lf-security-reviewer` or `lf-adversarial-reviewer` fits the diff, both with `model: "opus"` (per-call override; frontmatter stays sonnet). These two perform the analysis where model depth changes findings; the Codex adversarial pass is the third leg of the trio, run outside this skill as R2. All other personas remain sonnet even on hard triggers. On platforms without a per-call override, fall back to the default model rather than failing the dispatch.
+**Hard-trigger escalation (conditional).** When the diff hits a hard trigger -- schema/API/auth/migrations/cross-repo contracts, or anything hard to unwind -- the persona team is exactly `lf-correctness-reviewer` plus whichever of `lf-security-reviewer` or `lf-adversarial-reviewer` fits the diff. Route both on the frontier semantic tier: Claude Code uses Opus and Codex uses GPT-5.6 Sol, as a per-call override while canonical frontmatter stays on the balanced tier. These two perform the analysis where model depth changes findings. An optional out-of-family adversarial pass may be added outside this skill as R2. All other personas remain on the balanced tier even on hard triggers. On platforms without a per-call override, fall back to the default model rather than failing the dispatch.
 
 #### Run ID
 
@@ -750,20 +750,26 @@ If the platform doesn't support parallel sub-agents, run reviewers sequentially.
 
 ### Persona Catalog
 
-@./references/persona-catalog.md
+Load `references/persona-catalog.md` with the platform's native file-reading
+tool, resolving it relative to this `SKILL.md` directory.
 
 ### Subagent Template
 
-@./references/subagent-template.md
+Load `references/subagent-template.md` with the platform's native file-reading
+tool, resolving it relative to this `SKILL.md` directory.
 
 ### Diff Scope Rules
 
-@./references/diff-scope.md
+Load `references/diff-scope.md` with the platform's native file-reading tool,
+resolving it relative to this `SKILL.md` directory.
 
 ### Findings Schema
 
-@./references/findings-schema.json
+Load `references/findings-schema.json` with the platform's native file-reading
+tool, resolving it relative to this `SKILL.md` directory, and validate every
+reviewer result against it.
 
 ### Review Output Template
 
-@./references/review-output-template.md
+Load `references/review-output-template.md` with the platform's native
+file-reading tool, resolving it relative to this `SKILL.md` directory.

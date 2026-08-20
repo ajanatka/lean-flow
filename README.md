@@ -1,10 +1,10 @@
 # Lean Flow
 
-A Claude Code plugin + harness that packages a planning-heavy, review-gated, self-improving agentic engineering workflow. Skills for brainstorming and planning, persona agents for adversarial review, hooks that enforce the rules a prompt alone can't, and dispatch-lane agents that keep token spend proportional to how hard the work actually is.
+A cross-client Claude Code and Codex plugin plus a Claude Code harness that packages a planning-heavy, review-gated, self-improving agentic engineering workflow. Skills for brainstorming and planning, persona agents for adversarial review, hooks that enforce the rules a prompt alone can't, and dispatch-lane agents that keep token spend proportional to how hard the work actually is.
 
 ## What Lean Flow is
 
-- **`plugins/lean-flow/`** — a Claude Code plugin: 16 skills (brainstorm, plan, review, commit, learn, session search, and general-purpose process skills) and 31 persona agents that those skills dispatch for review and research.
+- **`plugins/lean-flow/`** — a Claude Code and Codex plugin: 16 skills (brainstorm, plan, review, commit, learn, session search, and general-purpose process skills) and 31 canonical persona prompts dispatched for review and research.
 - **`harness/`** — hooks and dispatch-lane agents you install into `~/.claude/`, on top of the plugin. This is the part that turns "a good workflow description" into "a workflow the model can't accidentally skip."
 
 Together they cover the full loop: brainstorm → plan → implement → review → learn, with review gated by independent fresh-context agents and the learning step enforced rather than optional.
@@ -49,14 +49,34 @@ Together they cover the full loop: brainstorm → plan → implement → review 
 
 4. **Optional: Linear setup.** If you want the issue-tracker integration, install with `--with-linear` and create `~/.claude/lean-flow.env` with `LF_LINEAR_TEAM_KEY` and `LF_LINEAR_TEAM_ID`. Full details, and how to swap in a different tracker entirely, in `docs/customization.md`.
 
+### Codex adapter development
+
+The Codex plugin manifest exposes the same 16 canonical skills. Codex custom
+agents are deterministic build artifacts generated from the 31 persona prompts
+and seven dispatch lanes; do not edit generated TOML by hand.
+
+```bash
+tmp_dir="$(mktemp -d)"
+python3 tools/generate_codex_agents.py --output "$tmp_dir"
+python3 tools/generate_codex_agents.py --output "$tmp_dir" --check
+python3 -m unittest discover -s tests -v
+```
+
+The generator refuses to write into live `~/.claude` or `~/.codex` homes. A
+versioned harness installer should copy the validated disposable layout during
+a release. Activate plugin or agent changes only in a new Codex session; no
+running Claude Code session needs to be interrupted. Model routing and generated
+ownership are defined in [`docs/cross-client-contract.md`](docs/cross-client-contract.md).
+This branch adds the adapter contract but does not bump or publish a release.
+
 ## Component map
 
 | Layer | What's in it | Reference |
 |---|---|---|
 | Plugin skills | 16 skills: the brainstorm → plan → review → commit → learn workflow, plus session-history search and general-purpose process skills (TDD, systematic debugging, worktree isolation) | `docs/skills.md` |
-| Plugin agents | 31 persona agents dispatched by `lf-doc-review` and `lf-code-review` for plan/code review, plus research agents (learnings, repo conventions, best practices, web, session history) | `docs/agents.md` |
+| Plugin agents | 31 canonical persona agents dispatched by `lf-doc-review` and `lf-code-review`; generated Codex names retain the `lf-` namespace | `docs/agents.md` |
 | Harness hooks | 7 core hooks (git hygiene, merge-base safety, model-triage nudge, learning/docs stop-gates) + 5 optional hooks (Linear integration, prod-safety draft) | `docs/hooks.md` |
-| Harness agents | 7 dispatch-lane agents: `scan-worker`, `sonnet-worker`, `advisor`, `learning-writer`, `docs-writer`, `linear-worker`, `alert-writer` | `docs/agents.md` |
+| Harness agents | 7 dispatch-lane agents; Claude compatibility aliases are translated to neutral `lf-*` Codex names | `docs/agents.md` |
 
 ## How a feature flows through the system
 
@@ -77,6 +97,7 @@ The plugin + harness above is the complete, self-contained core — everything y
 - `docs/orchestration.md` — model routing, handoff packets, return contracts, review policy (see the decision trees in docs/orchestration.md)
 - `docs/customization.md` — Linear config, swapping trackers, the learning-doc schema, disabling gates
 - `docs/optimizations.md` — the surrounding toolchain: output filtering, code-graph memory, institutional memory, second-model review
+- `docs/cross-client-contract.md` — canonical sources, Claude/Codex routing, generated ownership, validation, and activation
 
 ## License
 
