@@ -111,6 +111,49 @@ class CodexAdapterContractTest(unittest.TestCase):
             self.assertEqual("frontier", by_alias["advisor"]["semantic_tier"])
             self.assertEqual("sonnet", by_alias["sonnet-worker"]["claude_model"])
             self.assertTrue(all(len(entry["source_sha256"]) == 64 for entry in routing["agents"]))
+            expected_lanes = {
+                "advisor": ("read", ["read", "search", "shell-read"]),
+                "alert-writer": (
+                    "external-write",
+                    ["read", "search", "workspace-edit", "shell", "observability-write"],
+                ),
+                "docs-writer": (
+                    "workspace-write",
+                    ["read", "search", "workspace-edit", "shell"],
+                ),
+                "learning-writer": (
+                    "workspace-write",
+                    ["read", "search", "workspace-edit", "shell"],
+                ),
+                "linear-worker": ("external-write", ["read", "search", "issue-tracker-write"]),
+                "scan-worker": ("read", ["read", "search", "shell-read"]),
+                "sonnet-worker": (
+                    "workspace-write",
+                    ["read", "search", "workspace-edit", "shell"],
+                ),
+            }
+            for name, (permission, tools) in expected_lanes.items():
+                self.assertEqual(permission, by_alias[name]["permission_class"], name)
+                self.assertEqual(tools, by_alias[name]["tool_classes"], name)
+
+            artifact_agents = {"lf-data-integrity-guardian", "lf-learnings-researcher"}
+            for path in sorted(PERSONAS.glob("*.agent.md")):
+                fields, _ = load_generator().parse_prompt(path)
+                name = fields["name"]
+                expected_tools = {"read", "search"}
+                if "Bash" in fields.get("tools", ""):
+                    expected_tools.add("shell-read")
+                if "Web" in fields.get("tools", "") or "context7" in fields.get("tools", ""):
+                    expected_tools.add("web")
+                if "ToolSearch" in fields.get("tools", ""):
+                    expected_tools.add("tool-discovery")
+                if name.endswith("-reviewer") or name in artifact_agents:
+                    expected_permission = "read-with-run-artifact-write"
+                    expected_tools.add("review-artifact-write")
+                else:
+                    expected_permission = "read"
+                self.assertEqual(expected_permission, by_alias[name]["permission_class"], name)
+                self.assertEqual(sorted(expected_tools), by_alias[name]["tool_classes"], name)
 
     def test_check_mode_detects_drift(self) -> None:
         with tempfile.TemporaryDirectory() as output:
@@ -137,6 +180,27 @@ class CodexAdapterContractTest(unittest.TestCase):
             self.assertNotEqual(0, drifted.returncode)
             self.assertIn("drift", drifted.stderr.lower())
 
+            generated.unlink()
+            missing = subprocess.run(
+                [sys.executable, str(GENERATOR), "--output", output, "--check"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertNotEqual(0, missing.returncode)
+            self.assertIn("missing:", missing.stderr)
+
+            unexpected = Path(output) / "agents" / "lean-flow" / "lf-unexpected.toml"
+            unexpected.write_text('name = "lf-unexpected"\n', encoding="utf-8")
+            extra = subprocess.run(
+                [sys.executable, str(GENERATOR), "--output", output, "--check"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertNotEqual(0, extra.returncode)
+            self.assertIn("unexpected:", extra.stderr)
+
     def test_source_hashes_match_canonical_bytes(self) -> None:
         module = load_generator()
         catalog = module.build_catalog(ROOT)
@@ -144,6 +208,31 @@ class CodexAdapterContractTest(unittest.TestCase):
         for agent in catalog:
             source = ROOT / agent.source
             self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), agent.source_sha256)
+
+    def test_generated_instructions_retain_normalized_canonical_body(self) -> None:
+        module = load_generator()
+        with tempfile.TemporaryDirectory() as output:
+            subprocess.run(
+                [sys.executable, str(GENERATOR), "--output", output],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            for agent in module.build_catalog(ROOT):
+                source_text = (ROOT / agent.source).read_text(encoding="utf-8")
+                canonical_body = source_text[4:].split("\n---", 1)[1].removeprefix("\n").rstrip()
+                expected_body = canonical_body.replace("WebSearch", "native web search").replace(
+                    "WebFetch", "native web fetch/open"
+                )
+                generated = tomllib.loads(
+                    (Path(output) / "agents" / "lean-flow" / f"{agent.codex_name}.toml").read_text(
+                        encoding="utf-8"
+                    )
+                )["developer_instructions"]
+                actual_body, marker = generated.split("\n## Codex execution contract\n", 1)
+                self.assertEqual(expected_body, actual_body.rstrip(), agent.codex_name)
+                self.assertIn(agent.source_sha256, marker)
 
     def test_public_cross_client_artifacts_have_no_private_identifiers(self) -> None:
         paths = [ROOT / "docs" / "cross-client-contract.md", GENERATOR, PLUGIN_MANIFEST]
@@ -168,6 +257,8 @@ class CodexAdapterContractTest(unittest.TestCase):
         forbidden = (
             "ToolSearch",
             "Skill tool",
+            "WebSearch",
+            "WebFetch",
             "mcp__plugin_",
             "CLAUDE_ALLOW_",
             "/Users/andrew",
@@ -222,6 +313,79 @@ class CodexAdapterContractTest(unittest.TestCase):
             self.assertFalse((Path(fake_home) / ".claude").exists())
             self.assertFalse((Path(fake_home) / ".codex").exists())
             self.assertTrue((Path(output) / "agents" / "lean-flow").is_dir())
+
+    def test_live_and_custom_codex_homes_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as fake_home, tempfile.TemporaryDirectory() as custom_home:
+            env = {**os.environ, "HOME": fake_home, "CODEX_HOME": custom_home}
+            for target in (Path(fake_home) / ".codex" / "generated", Path(custom_home) / "generated"):
+                result = subprocess.run(
+                    [sys.executable, str(GENERATOR), "--output", str(target)],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                )
+                self.assertEqual(2, result.returncode)
+                self.assertIn("refusing live runtime target", result.stderr)
+                self.assertFalse(target.exists())
+
+    def test_child_symlink_and_invalid_agent_name_fail_closed(self) -> None:
+        module = load_generator()
+        with tempfile.TemporaryDirectory() as output, tempfile.TemporaryDirectory() as sentinel:
+            output_root = Path(output)
+            (output_root / "agents").symlink_to(sentinel, target_is_directory=True)
+            result = subprocess.run(
+                [sys.executable, str(GENERATOR), "--output", output],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+            self.assertEqual(2, result.returncode)
+            self.assertIn("symlink", result.stderr)
+            self.assertEqual([], list(Path(sentinel).rglob("*")))
+
+        persona = next(PERSONAS.glob("*.agent.md"))
+        fields, _ = module.parse_prompt(persona)
+        bad_name = "lf-/../../escape"
+        with tempfile.TemporaryDirectory() as fixture:
+            root = Path(fixture)
+            source = root / "plugins" / "lean-flow" / "agents"
+            lanes = root / "harness" / "agents"
+            skills = root / "plugins" / "lean-flow" / "skills"
+            source.mkdir(parents=True)
+            lanes.mkdir(parents=True)
+            skills.mkdir(parents=True)
+            for path in PERSONAS.glob("*.agent.md"):
+                target = source / path.name
+                target.write_bytes(path.read_bytes())
+            for path in LANES.glob("*.md"):
+                (lanes / path.name).write_bytes(path.read_bytes())
+            for path in SKILLS.iterdir():
+                target = skills / path.name
+                target.mkdir()
+                (target / "SKILL.md").write_text("fixture\n", encoding="utf-8")
+            bad_source = source / persona.name
+            original = bad_source.read_text(encoding="utf-8")
+            bad_source.write_text(original.replace(f"name: {fields['name']}", f"name: {bad_name}", 1))
+            with self.assertRaisesRegex(ValueError, "invalid namespaced persona name"):
+                module.build_catalog(root)
+
+    def test_invalid_effort_and_duplicate_frontmatter_are_rejected(self) -> None:
+        module = load_generator()
+        with tempfile.TemporaryDirectory() as fixture:
+            path = Path(fixture) / "agent.md"
+            path.write_text(
+                "---\nname: lf-fixture\ndescription: fixture\nmodel: sonnet\neffort: typo\n---\nbody\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "unsupported effort"):
+                module.parse_prompt(path)
+            path.write_text(
+                "---\nname: lf-fixture\nname: lf-duplicate\ndescription: fixture\nmodel: sonnet\neffort: medium\n---\nbody\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "duplicate frontmatter field"):
+                module.parse_prompt(path)
 
 
 if __name__ == "__main__":

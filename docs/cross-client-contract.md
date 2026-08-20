@@ -40,12 +40,15 @@ Claude workflows do not change at adapter-generation time.
 The contract expresses tools as portable classes, not client API names:
 
 - `read`, `search`, `shell-read`, and `web` for research and review.
+- `review-artifact-write` for the one assigned, run-scoped review artifact;
+  reviewer personas remain read-only everywhere else.
 - `workspace-edit` and `shell` for bounded implementation and documentation.
 - `issue-tracker-write` and `observability-write` for explicitly authorized
   external actions.
 - `tool-discovery` when a task must locate an optional runtime capability.
 
-Permissions are `read`, `workspace-write`, or `external-write`. Generated TOML
+Permissions are `read`, `read-with-run-artifact-write`, `workspace-write`, or
+`external-write`. Generated TOML
 contains only the Codex-supported `name`, `description`, and
 `developer_instructions` fields. The instructions append the semantic tool and
 permission boundary. They never grant a capability the runtime or user did not

@@ -11,7 +11,9 @@ import argparse
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import sys
 from typing import Iterable
 
@@ -28,6 +30,13 @@ SEMANTIC_TIER_MAP = {
     "opus": "frontier",
 }
 
+SUPPORTED_EFFORTS = {"low", "medium", "high"}
+AGENT_NAME_PATTERN = re.compile(r"^lf-[a-z0-9]+(?:-[a-z0-9]+)*$")
+REVIEW_ARTIFACT_AGENT_NAMES = {
+    "lf-data-integrity-guardian",
+    "lf-learnings-researcher",
+}
+
 LANE_NAMES = {
     "advisor": "lf-advisor",
     "alert-writer": "lf-alert-writer",
@@ -40,7 +49,10 @@ LANE_NAMES = {
 
 LANE_CONTRACTS = {
     "advisor": ("read", ["read", "search", "shell-read"]),
-    "alert-writer": ("external-write", ["read", "search", "observability-write"]),
+    "alert-writer": (
+        "external-write",
+        ["read", "search", "workspace-edit", "shell", "observability-write"],
+    ),
     "docs-writer": ("workspace-write", ["read", "search", "workspace-edit", "shell"]),
     "learning-writer": ("workspace-write", ["read", "search", "workspace-edit", "shell"]),
     "linear-worker": ("external-write", ["read", "search", "issue-tracker-write"]),
@@ -94,13 +106,18 @@ def _parse_prompt_bytes(path: Path, content: bytes) -> tuple[dict[str, str], str
         if ":" not in line or line.startswith((" ", "\t")):
             raise ValueError(f"{path}:{line_number}: unsupported frontmatter shape")
         key, value = line.split(":", 1)
-        fields[key.strip()] = _parse_scalar(value)
+        key = key.strip()
+        if key in fields:
+            raise ValueError(f"{path}:{line_number}: duplicate frontmatter field {key!r}")
+        fields[key] = _parse_scalar(value)
     required = {"name", "description", "model", "effort"}
     missing = required - fields.keys()
     if missing:
         raise ValueError(f"{path}: missing frontmatter fields: {', '.join(sorted(missing))}")
     if fields["model"] not in MODEL_MAP:
         raise ValueError(f"{path}: unsupported model tier {fields['model']!r}")
+    if fields["effort"] not in SUPPORTED_EFFORTS:
+        raise ValueError(f"{path}: unsupported effort {fields['effort']!r}")
     return fields, body
 
 
@@ -108,8 +125,14 @@ def parse_prompt(path: Path) -> tuple[dict[str, str], str]:
     return _parse_prompt_bytes(path, path.read_bytes())
 
 
-def _persona_tool_classes(tools: str) -> tuple[str, ...]:
+def _is_review_artifact_agent(name: str) -> bool:
+    return name.endswith("-reviewer") or name in REVIEW_ARTIFACT_AGENT_NAMES
+
+
+def _persona_tool_classes(name: str, tools: str) -> tuple[str, ...]:
     classes = {"read", "search"}
+    if _is_review_artifact_agent(name):
+        classes.add("review-artifact-write")
     if "Bash" in tools:
         classes.add("shell-read")
     if "Web" in tools or "context7" in tools:
@@ -152,8 +175,8 @@ def build_catalog(root: Path) -> list[Agent]:
         content = path.read_bytes()
         fields, body = _parse_prompt_bytes(path, content)
         name = fields["name"]
-        if not name.startswith("lf-"):
-            raise ValueError(f"{path}: persona name must use lf- namespace")
+        if not AGENT_NAME_PATTERN.fullmatch(name):
+            raise ValueError(f"{path}: invalid namespaced persona name {name!r}")
         agents.append(
             Agent(
                 codex_name=name,
@@ -167,8 +190,10 @@ def build_catalog(root: Path) -> list[Agent]:
                 semantic_tier=SEMANTIC_TIER_MAP[fields["model"]],
                 codex_model=MODEL_MAP[fields["model"]],
                 effort=fields["effort"],
-                permission_class="read",
-                tool_classes=_persona_tool_classes(fields.get("tools", "")),
+                permission_class=(
+                    "read-with-run-artifact-write" if _is_review_artifact_agent(name) else "read"
+                ),
+                tool_classes=_persona_tool_classes(name, fields.get("tools", "")),
             )
         )
 
@@ -209,8 +234,21 @@ def build_catalog(root: Path) -> list[Agent]:
     return agents
 
 
+def normalize_codex_instructions(instructions: str) -> str:
+    """Translate exact Claude web-tool names into Codex-native capabilities."""
+    return instructions.replace("WebSearch", "native web search").replace(
+        "WebFetch", "native web fetch/open"
+    )
+
+
 def _execution_contract(agent: Agent) -> str:
     tools = ", ".join(agent.tool_classes)
+    artifact_boundary = ""
+    if agent.permission_class == "read-with-run-artifact-write":
+        artifact_boundary = (
+            "- The only permitted project write is the explicitly assigned, run-scoped "
+            "review artifact. Do not edit source files or write anywhere else.\n"
+        )
     return (
         "\n## Codex execution contract\n\n"
         f"- Semantic model tier: `{agent.semantic_tier}`; route to `{agent.codex_model}` "
@@ -220,6 +258,7 @@ def _execution_contract(agent: Agent) -> str:
         f"- Permission class: `{agent.permission_class}`. Stay within this boundary even if "
         "the surrounding session has broader permissions. External writes require explicit "
         "task authority and the runtime's normal confirmation policy.\n"
+        f"{artifact_boundary}"
         "- Follow repository instructions and return bounded evidence. Stop and ask rather "
         "than inventing unavailable tools, permissions, requirements, or external state.\n"
         f"- Canonical source: `{agent.source}` (`sha256:{agent.source_sha256}`).\n"
@@ -234,7 +273,7 @@ def _toml_string(value: str) -> str:
 
 
 def render_agent(agent: Agent) -> bytes:
-    instructions = agent.instructions.rstrip() + "\n" + _execution_contract(agent)
+    instructions = normalize_codex_instructions(agent.instructions).rstrip() + "\n" + _execution_contract(agent)
     text = (
         f"name = {_toml_string(agent.codex_name)}\n"
         f"description = {_toml_string(agent.description)}\n"
@@ -285,7 +324,10 @@ def desired_files(root: Path) -> dict[Path, bytes]:
 def validate_output_target(output: Path) -> Path:
     output = output.expanduser().resolve()
     home = Path.home().resolve()
-    for live_home in (home / ".claude", home / ".codex"):
+    live_homes = {home / ".claude", home / ".codex"}
+    if codex_home := os.environ.get("CODEX_HOME"):
+        live_homes.add(Path(codex_home).expanduser().resolve())
+    for live_home in live_homes:
         if output.is_relative_to(live_home):
             raise ValueError(
                 f"refusing live runtime target {output}; generate in a disposable directory and install explicitly"
@@ -293,15 +335,29 @@ def validate_output_target(output: Path) -> Path:
     return output
 
 
+def managed_path(output: Path, relative_path: Path) -> Path:
+    """Resolve one managed path without permitting traversal or child symlinks."""
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError(f"managed path escapes output root: {relative_path}")
+    current = output
+    for part in relative_path.parts:
+        current /= part
+        if current.is_symlink():
+            raise ValueError(f"managed path contains symlink: {current}")
+    if not current.resolve().is_relative_to(output):
+        raise ValueError(f"managed path escapes output root: {relative_path}")
+    return current
+
+
 def check_output(output: Path, expected: dict[Path, bytes]) -> list[str]:
     drift: list[str] = []
-    managed_dir = output / "agents" / "lean-flow"
+    managed_dir = managed_path(output, Path("agents/lean-flow"))
     actual_paths = {
         path.relative_to(output)
         for path in managed_dir.glob("*.toml")
         if path.is_file()
     }
-    manifest = output / "lean-flow-routing.json"
+    manifest = managed_path(output, Path("lean-flow-routing.json"))
     if manifest.is_file():
         actual_paths.add(manifest.relative_to(output))
     expected_paths = set(expected)
@@ -310,20 +366,25 @@ def check_output(output: Path, expected: dict[Path, bytes]) -> list[str]:
     for path in sorted(actual_paths - expected_paths):
         drift.append(f"unexpected: {path}")
     for path in sorted(expected_paths & actual_paths):
-        if (output / path).read_bytes() != expected[path]:
+        if managed_path(output, path).read_bytes() != expected[path]:
             drift.append(f"changed: {path}")
     return drift
 
 
 def write_output(output: Path, expected: dict[Path, bytes]) -> None:
-    managed_dir = output / "agents" / "lean-flow"
+    managed_dir = managed_path(output, Path("agents/lean-flow"))
     managed_dir.mkdir(parents=True, exist_ok=True)
-    expected_agent_paths = {output / path for path in expected if path.parent == Path("agents/lean-flow")}
+    expected_agent_paths = {
+        managed_path(output, path)
+        for path in expected
+        if path.parent == Path("agents/lean-flow")
+    }
     for stale in managed_dir.glob("*.toml"):
+        managed_path(output, stale.relative_to(output))
         if stale not in expected_agent_paths:
             stale.unlink()
     for relative_path, content in expected.items():
-        destination = output / relative_path
+        destination = managed_path(output, relative_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(content)
 
@@ -338,23 +399,22 @@ def main(argv: list[str] | None = None) -> int:
     try:
         output = validate_output_target(args.output)
         expected = desired_files(root)
+        if args.check:
+            drift = check_output(output, expected)
+            if drift:
+                print("generated adapter drift detected:", file=sys.stderr)
+                for finding in drift:
+                    print(f"  {finding}", file=sys.stderr)
+                return 1
+            print(f"OK: {len(expected) - 1} agents match canonical sources")
+            return 0
+
+        write_output(output, expected)
+        print(f"Generated {len(expected) - 1} Codex agents in {output}")
+        return 0
     except (OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-
-    if args.check:
-        drift = check_output(output, expected)
-        if drift:
-            print("generated adapter drift detected:", file=sys.stderr)
-            for finding in drift:
-                print(f"  {finding}", file=sys.stderr)
-            return 1
-        print(f"OK: {len(expected) - 1} agents match canonical sources")
-        return 0
-
-    write_output(output, expected)
-    print(f"Generated {len(expected) - 1} Codex agents in {output}")
-    return 0
 
 
 if __name__ == "__main__":
