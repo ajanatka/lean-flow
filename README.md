@@ -67,7 +67,8 @@ versioned harness installer should copy the validated disposable layout during
 a release. Activate plugin or agent changes only in a new Codex session; no
 running Claude Code session needs to be interrupted. Model routing and generated
 ownership are defined in [`docs/cross-client-contract.md`](docs/cross-client-contract.md).
-This branch adds the adapter contract but does not bump or publish a release.
+The Claude and Codex manifests share one release version so either client can
+pin the exact cross-client contract it installed.
 
 ## Component map
 

@@ -44,6 +44,17 @@ class CodexAdapterContractTest(unittest.TestCase):
 
         manifest = json.loads(PLUGIN_MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual("./skills/", manifest["skills"])
+        claude_manifest = json.loads(
+            (ROOT / "plugins" / "lean-flow" / ".claude-plugin" / "plugin.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        marketplace = json.loads(
+            (ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual("1.3.0", manifest["version"])
+        self.assertEqual(manifest["version"], claude_manifest["version"])
+        self.assertEqual(manifest["version"], marketplace["plugins"][0]["version"])
 
     def test_generation_is_deterministic_and_portable(self) -> None:
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
