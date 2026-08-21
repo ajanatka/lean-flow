@@ -55,14 +55,16 @@ Two populations of agents ship with Lean Flow, and they answer different questio
 
 ## Harness dispatch-lane agents
 
-| Agent | Model | Purpose |
-|---|---|---|
-| `scan-worker` | Haiku, low effort | Read-only file discovery, grep sweeps, log reduction, config reads. Never edits anything. |
-| `sonnet-worker` | Sonnet | Implementation from a bounded, self-contained handoff packet. Not for open-ended exploration or plan changes — stops and reports if the brief is wrong or ambiguous. |
-| `advisor` | Opus | On-demand judgment consult for sessions driven by a cheaper model — reviews a plan/diff/decision and returns direction and risks. Never implements. Call sparingly: once at the plan gate, once at final review. |
-| `learning-writer` | Sonnet | Authors `docs/solutions/` learning docs by invoking `lf-learn` and taking its recommended choices without asking. All `lf-learn` runs should go through this agent, never inline on the orchestrator model. |
-| `docs-writer` | Sonnet | Session close-out documentation: updates agent/dev-facing reference docs and, if the repo has one, a human-readable manual, then commits docs-only source. Never deploys anything. Stays out of `docs/solutions/` (that's `learning-writer`'s job). |
-| `linear-worker` | Sonnet | Composes and executes issue tracker writes (create/update/reconcile), keyed by `$LF_LINEAR_TEAM_KEY`. Optional — only relevant if you wire in the Linear hooks. See `docs/customization.md`. |
-| `alert-writer` | Sonnet | Designs and wires observability alerting (derived metrics, dashboard charts, chart alerts, heartbeats/monitors — Better Stack or your platform's equivalent) for newly shipped failure signals, at close-out or on demand. Triages first and may report "no alert needed." |
+| Claude alias | Codex name | Semantic tier | Purpose |
+|---|---|---|---|
+| `scan-worker` | `lf-scan-worker` | fast: Haiku / GPT-5.6 Luna, low effort | Read-only file discovery, grep sweeps, log reduction, config reads. Never edits anything. |
+| `sonnet-worker` | `lf-implementation-worker` | balanced: Sonnet / GPT-5.6 Terra, high effort | Implementation from a bounded, self-contained handoff packet. Not for open-ended exploration or plan changes — stops and reports if the brief is wrong or ambiguous. |
+| `advisor` | `lf-advisor` | frontier: Opus / GPT-5.6 Sol, high effort | On-demand judgment consult for sessions driven by a cheaper model — reviews a plan/diff/decision and returns direction and risks. Never implements. |
+| `learning-writer` | `lf-learning-writer` | balanced: Sonnet / GPT-5.6 Terra, medium effort | Authors concise `docs/solutions/` learning docs by invoking `lf-learn` and taking its recommended choices without asking. |
+| `docs-writer` | `lf-docs-writer` | balanced: Sonnet / GPT-5.6 Terra, medium effort | Session close-out documentation. Never deploys anything and stays out of `docs/solutions/`. |
+| `linear-worker` | `lf-linear-worker` | balanced: Sonnet / GPT-5.6 Terra, low effort | Composes and executes explicitly authorized issue tracker writes. Optional. |
+| `alert-writer` | `lf-alert-writer` | balanced: Sonnet / GPT-5.6 Terra, medium effort | Designs and wires explicitly authorized observability alerting, triaging first and possibly reporting "no alert needed." |
 
 See `docs/orchestration.md` for the routing logic behind when to use each dispatch-lane agent, and `docs/overview.md` for how skills invoke the persona agents above.
+The complete portable naming, tool, and permission contract is in
+`docs/cross-client-contract.md`.

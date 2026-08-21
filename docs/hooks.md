@@ -42,7 +42,6 @@ Merge this `hooks` block into `~/.claude/settings.json` (create the file if it d
     ],
     "Stop": [
       { "hooks": [
-        { "type": "command", "command": "~/.claude/hooks/plan-completion-gate.sh", "timeout": 10 },
         { "type": "command", "command": "~/.claude/hooks/learn-stop-gate.sh", "timeout": 10 },
         { "type": "command", "command": "~/.claude/hooks/docs-freshness-gate.sh", "timeout": 10 }
       ] }
@@ -50,6 +49,12 @@ Merge this `hooks` block into `~/.claude/settings.json` (create the file if it d
   }
 }
 ```
+
+To opt into plan completion enforcement, add
+`~/.claude/hooks/plan-completion-gate.sh` to the `Stop` hook list before the
+learning and documentation gates. Do this only after confirming the repository
+maintains plan checkbox state; it is not part of the default wiring in
+`harness/settings.example.json`.
 
 ## Optional hooks
 

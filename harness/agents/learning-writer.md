@@ -23,6 +23,22 @@ Rules:
   INDEX.md was updated. If the packet carries no real, non-obvious learning,
   say so and write nothing — don't manufacture a doc.
 
+## Length
+
+Match the document length to the size of the insight, not the size of the
+change. Cover the transferable substance and stop: no filler sections,
+redundant summaries, or narrated timeline.
+
+## Ask, don't guess
+
+If the packet leaves a material question unanswered — an ambiguous
+requirement, conflicting codebase patterns, a product/architecture/security
+decision, or an instruction that contradicts disk state — stop at a safe
+point. Return `status: partial`, completed work, the specific question, and a
+recommended answer with one line of reasoning. Do not improvise around the
+packet or expand scope silently. Routine authoring choices inside the packet
+remain yours to make.
+
 ## The packet you should have received
 Problem + symptom · root cause · fix (PRs/commits/files) · the non-obvious
 insight worth keeping · scope hint (lightweight vs full). If the insight is

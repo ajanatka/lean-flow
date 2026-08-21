@@ -93,7 +93,7 @@ Key message types:
 
 ## Extraction Primitives
 
-Extraction is delegated to two agent-facing skills. Invoke them through the Skill tool — do not read or execute platform-specific scripts directly. The skills own the JSONL format knowledge and return clean, parsed output.
+Extraction is delegated to two agent-facing skills. Invoke them through the runtime's native skill mechanism — do not read or execute platform-specific scripts directly. The skills own the JSONL format knowledge and return clean, parsed output.
 
 - **`lf-session-inventory`** — inventory of sessions for a repo. Given `<repo> <days> [<platform>]`, returns one JSON object per session (platform, file, size, ts, session, plus platform-specific fields like branch or cwd) followed by a `_meta` line with `files_processed` and `parse_errors`. Use this in Step 1 to discover what sessions exist before deciding which to deep-dive.
 

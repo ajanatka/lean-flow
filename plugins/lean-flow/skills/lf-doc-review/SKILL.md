@@ -191,8 +191,12 @@ For the four-option routing question and per-finding walk-through (interactive m
 
 ### Subagent Template
 
-@./references/subagent-template.md
+Load `references/subagent-template.md` with the platform's native file-reading
+tool. Resolve the path relative to this `SKILL.md` directory and follow the
+entire template before dispatching reviewers.
 
 ### Findings Schema
 
-@./references/findings-schema.json
+Load `references/findings-schema.json` with the platform's native file-reading
+tool, resolving it relative to this `SKILL.md` directory. Validate every
+reviewer result against that schema.
