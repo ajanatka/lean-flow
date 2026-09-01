@@ -1,13 +1,11 @@
 # Optional personas (not loaded)
 
-Agents in this directory are NOT registered with Claude Code — a plugin only loads
-`agents/`. They were moved here 2026-09-01 because a 30-day transcript census showed
-each dispatched 0–2 times while their descriptions were carried in every session's
-system prompt. Everything in `agents/` was dispatched ≥6 times or is required by an
-`lf-*` skill's always-on set (`lf-code-review`: agent-native + learnings-researcher;
-`lf-doc-review`: coherence + product-lens + scope-guardian; `lf-sessions`: session-historian).
+Agents here are NOT registered — a plugin only loads `agents/`. Only personas that **no
+`lf-*` skill dispatches by name** may live here (Codex review 2026-09-01: an earlier cut moved
+15 personas while `lf-plan`, `lf-code-review`, `lf-doc-review` and `lf-learn` still dispatched
+14 of them, which would have failed with "unknown agent"). Current census: `lf-web-researcher`
+(0 skill references, 1 dispatch in 30 days).
 
-To re-enable one: `git mv agents-optional/<name>.md agents/` and bump the plugin
-version. The persona catalogs inside `skills/lf-code-review` and `skills/lf-doc-review`
-still describe these personas; a dispatch to an optional persona fails with "unknown
-agent" — pick one from `agents/` instead.
+To prune more, first remove or gate every reference in `skills/*/SKILL.md` and
+`skills/*/references/*.md`, then `git mv` the agent here and bump the plugin version.
+To re-enable: `git mv agents-optional/<name>.agent.md agents/` and bump the version.
