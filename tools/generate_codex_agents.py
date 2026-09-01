@@ -22,12 +22,14 @@ MODEL_MAP = {
     "haiku": "gpt-5.6-luna",
     "sonnet": "gpt-5.6-terra",
     "opus": "gpt-5.6-sol",
+    "fable": "gpt-5.6-sol",   # Claude Fable tier has no Codex analogue above sol
 }
 
 SEMANTIC_TIER_MAP = {
     "haiku": "fast",
     "sonnet": "balanced",
     "opus": "frontier",
+    "fable": "frontier",
 }
 
 SUPPORTED_EFFORTS = {"low", "medium", "high"}

@@ -3,6 +3,13 @@
 # update this session's (toplevel -> branch) pin so intentional branch changes
 # don't trip the drift block in git-ground-truth.sh.
 input=$(cat)
+
+# Cheap pre-filter before spawning a Python interpreter: this hook fires on every
+# Bash call but only acts on branch/worktree switches. Deliberate superset of the
+# precise check below — a false positive falls through, so behavior is unchanged
+# and only the interpreter start is skipped.
+grep -qE 'checkout|switch|worktree' <<<"$input" || exit 0
+
 cmd=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' <<<"$input" 2>/dev/null)
 echo "$cmd" | grep -qE '\bgit +(-C +[^ ]+ +)?(checkout|switch|worktree)\b' || exit 0
 

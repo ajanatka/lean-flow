@@ -23,6 +23,13 @@
 # never make merging impossible; it exists to catch the silent-wrong-base case.
 
 input=$(cat)
+
+# Cheap pre-filter on the raw payload BEFORE spawning a Python interpreter: this
+# hook fires on every Bash call but only acts on `gh pr merge`. The filter is a
+# deliberate superset of the precise check below, so a false positive just falls
+# through to it — behavior is unchanged, only the interpreter start is skipped.
+grep -q 'merge' <<<"$input" || exit 0
+
 cmd=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' <<<"$input" 2>/dev/null)
 
 echo "$cmd" | grep -qE '\bgh +pr +merge\b' || exit 0
