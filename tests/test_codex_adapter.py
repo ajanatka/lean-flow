@@ -52,7 +52,7 @@ class CodexAdapterContractTest(unittest.TestCase):
         marketplace = json.loads(
             (ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
         )
-        self.assertEqual("1.3.0", manifest["version"])
+        self.assertEqual("1.3.1", manifest["version"])
         self.assertEqual(manifest["version"], claude_manifest["version"])
         self.assertEqual(manifest["version"], marketplace["plugins"][0]["version"])
 
