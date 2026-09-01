@@ -16,11 +16,30 @@
 
 input=$(cat)
 
+tool_name=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_name",""))' <<<"$input" 2>/dev/null)
+
+# Cursor failClosed treats non-JSON stdout as hook failure. Advisory text
+# goes to stderr. Shell invocations emit a permission object on stdout.
+cursor_allow() {
+  if [ "$tool_name" = "Shell" ]; then
+    printf '%s\n' '{"permission":"allow"}'
+  fi
+  exit 0
+}
+
+cursor_deny() {
+  if [ "$tool_name" = "Shell" ]; then
+    python3 -c 'import json,sys; print(json.dumps({"permission":"deny","user_message":sys.argv[1],"agent_message":sys.argv[1]},separators=(",",":")))' "$1"
+    exit 0
+  fi
+  exit 2
+}
+
 # Cheap pre-filter before spawning a Python interpreter: this hook fires on every
 # Bash call but only acts on state-changing git commands. Deliberate superset of
 # the precise check below — a false positive falls through, so behavior is
 # unchanged and only the interpreter start is skipped.
-grep -q 'git' <<<"$input" || exit 0
+grep -q 'git' <<<"$input" || cursor_allow
 
 cmd=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("command",""))' <<<"$input" 2>/dev/null)
 
@@ -60,7 +79,7 @@ has_override() {
 # Matching only an optional `-C <dir>` meant `git -c key=val commit` fell
 # through this filter and exited before ANY protection ran — a clean bypass
 # (adversarial review 2026-07-28). Also covers --git-dir / --work-tree / -c.
-echo " $cmd_unquoted" | grep -qE '(^|[;&|(]|[[:space:]])git +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +|--[a-z-]+ +)*(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || exit 0
+echo " $cmd_unquoted" | grep -qE '(^|[;&|(]|[[:space:]])git +((-C|-c|--git-dir|--work-tree|--namespace)[= ]+[^ ]+ +|--[a-z-]+ +)*(commit|push|merge|rebase|reset|branch +-D|checkout|switch|worktree)' || cursor_allow
 
 session_id=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))' <<<"$input" 2>/dev/null)
 
@@ -166,7 +185,7 @@ PYEOF
 
 [ -n "$wd" ] && [ -d "$wd" ] || wd="."
 
-branch=$(git -C "$wd" rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+branch=$(git -C "$wd" rev-parse --abbrev-ref HEAD 2>/dev/null) || cursor_allow
 top=$(git -C "$wd" rev-parse --show-toplevel 2>/dev/null)
 gitdir=$(git -C "$wd" rev-parse --absolute-git-dir 2>/dev/null)
 common=$(git -C "$wd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
@@ -187,12 +206,12 @@ default=${default:-main}
 # direct-to-main by design like the harness repo, and are NOT the code repos
 # this worktree/main policy exists to protect. Owner-confirmed 2026-07-28.
 if [ "${MULTI_GIT:-0}" = "1" ]; then
-  echo "[git-ground-truth] multiple destructive git invocations in one command — exemption refused (cannot prove which repo each targets)."
+  echo "[git-ground-truth] multiple destructive git invocations in one command — exemption refused (cannot prove which repo each targets)." >&2
 else
 case "$top" in
   "$HOME/.claude" | "$HOME/.claude"/*)
-    echo "[git-ground-truth] harness/plugin repo ($top) — direct-to-main by design; guard exempt."
-    exit 0
+    echo "[git-ground-truth] harness/plugin repo ($top) — direct-to-main by design; guard exempt." >&2
+    cursor_allow
     ;;
 esac
 fi
@@ -329,7 +348,7 @@ if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]
   # configurable) are exempt from this budget entirely — the override prefix
   # is still required.
   if [ "$docs_only" = true ] && echo "$cmd" | grep -qE 'CLAUDE_(ALLOW_MAIN|ALLOW_SHARED_CHECKOUT)=1'; then
-    echo "[git-guard] docs-only exemption (standing policy, configurable): budget not consumed"
+    echo "[git-guard] docs-only exemption (standing policy, configurable): budget not consumed" >&2
   elif echo "$cmd" | grep -qE 'CLAUDE_(ALLOW_MAIN|ALLOW_SHARED_CHECKOUT|REPIN)=1' \
      && ! has_override CLAUDE_USER_APPROVED && [ -n "$session_id" ]; then
     budget_file="$HOME/.claude/state/git-session-pins/$session_id.overrides"
@@ -337,29 +356,29 @@ if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]
     used=${used:-0}
     if [ "$used" -ge 3 ]; then
       echo "BLOCKED: git-guard override budget exhausted ($used/3 this session). Repeated overrides mean the session is fighting the worktree policy, not making a deliberate exception. Stop and ask the repo owner: either move this work to an isolated worktree, or get explicit approval and prefix the command with CLAUDE_USER_APPROVED=1. Do not self-grant approval." >&2
-      exit 2
+      cursor_deny "BLOCKED: git-guard override budget exhausted ($used/3 this session). Repeated overrides mean the session is fighting the worktree policy, not making a deliberate exception. Stop and ask the repo owner: either move this work to an isolated worktree, or get explicit approval and prefix the command with CLAUDE_USER_APPROVED=1. Do not self-grant approval."
     fi
     date '+%Y-%m-%dT%H:%M:%S' >> "$budget_file"
-    echo "[git-guard] override $((used + 1))/3 used this session (budget resets per session; beyond 3 requires the repo owner's explicit approval)."
+    echo "[git-guard] override $((used + 1))/3 used this session (budget resets per session; beyond 3 requires the repo owner's explicit approval)." >&2
   fi
   # 1. Default-branch commits
   if [ "$branch" = "$default" ] && ! has_override CLAUDE_ALLOW_MAIN; then
     echo "BLOCKED: git commit/push on default branch '$default' in $top. Branch first (ideally in an isolated worktree), or prefix the command with CLAUDE_ALLOW_MAIN=1 for a deliberate main commit." >&2
-    exit 2
+    cursor_deny "BLOCKED: git commit/push on default branch '$default' in $top. Branch first (ideally in an isolated worktree), or prefix the command with CLAUDE_ALLOW_MAIN=1 for a deliberate main commit."
   fi
   # 2. Shared main checkout commits (any branch) — only when the repo actually
   # has linked worktrees; standalone repos without worktrees are not "shared".
   if [ "$gitdir" = "$common" ] && [ "$(git -C "$wd" worktree list 2>/dev/null | wc -l)" -gt 1 ] \
      && ! echo "$cmd" | grep -qE 'CLAUDE_ALLOW_(SHARED_CHECKOUT|MAIN)=1'; then
     echo "BLOCKED: committing in the SHARED main checkout ($top, branch '$branch'). Other sessions share this index — bare commits here have swept unrelated staged files. Move the work to an isolated worktree, or if this checkout genuinely owns the work, prefix with CLAUDE_ALLOW_SHARED_CHECKOUT=1 and commit with explicit paths (never a bare 'git commit -a')." >&2
-    exit 2
+    cursor_deny "BLOCKED: committing in the SHARED main checkout ($top, branch '$branch'). Other sessions share this index — bare commits here have swept unrelated staged files. Move the work to an isolated worktree, or if this checkout genuinely owns the work, prefix with CLAUDE_ALLOW_SHARED_CHECKOUT=1 and commit with explicit paths (never a bare 'git commit -a')."
   fi
   # 3. Session branch-pin drift
   if [ -n "$session_id" ] && [ -f "$HOME/.claude/state/git-session-pins/$session_id" ]; then
     pinned=$(grep "^$top	" "$HOME/.claude/state/git-session-pins/$session_id" | cut -f2 | tail -1)
     if [ -n "$pinned" ] && [ "$pinned" != "$branch" ] && ! has_override CLAUDE_REPIN; then
       echo "BLOCKED: branch drift — this session pinned '$pinned' for $top but HEAD is now '$branch'. Another session/CLI may have switched branches underneath you. Verify with 'git log -3 --oneline' + 'git status' that '$branch' is where this work belongs. If yes, re-pin by prefixing the command with CLAUDE_REPIN=1; if not, 'git switch $pinned' first." >&2
-      exit 2
+      cursor_deny "BLOCKED: branch drift — this session pinned '$pinned' for $top but HEAD is now '$branch'. Another session/CLI may have switched branches underneath you. Verify with 'git log -3 --oneline' + 'git status' that '$branch' is where this work belongs. If yes, re-pin by prefixing the command with CLAUDE_REPIN=1; if not, 'git switch $pinned' first."
     fi
     if has_override CLAUDE_REPIN; then
       pinfile="$HOME/.claude/state/git-session-pins/$session_id"
@@ -369,5 +388,5 @@ if echo "$cmd" | grep -qE '\bgit +((-C|-c|--git-dir|--work-tree|--namespace)[= ]
 fi
 
 # Non-blocking ground truth injection for everything else
-echo "[git-ground-truth] cwd=$(pwd) | effective-dir=$wd | repo=$top | branch=$branch | staged=$(git -C "$wd" diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ') files"
-exit 0
+echo "[git-ground-truth] cwd=$(pwd) | effective-dir=$wd | repo=$top | branch=$branch | staged=$(git -C "$wd" diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ') files" >&2
+cursor_allow
