@@ -23,17 +23,19 @@ META="$DIR/${TEAM_SLUG}-open.meta"
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # Refresh if stale (the script self-gates on age; safe to call every time).
-# First run (no TSV yet) is synchronous: nothing to brief from until it
-# completes. When an index already exists, brief from ONE consistent snapshot
-# of the current TSV taken up front, then kick the refresh off in the
-# BACKGROUND — the age line discloses staleness, and a stale-index API call
-# was the one network stall on the SessionStart path (up to 8s). Snapshot
-# first so a mid-briefing index replacement can't mix counts from two index
-# versions. Refresh is fully detached (</dev/null + both fds redirected) so
-# the hook's stdout closes and Claude Code doesn't wait on the child.
+# The refresh is ALWAYS detached, including the first run: it now walks every
+# page (three requests at ~630 open issues, up to 8s each), which no longer fits
+# the 12s SessionStart budget, and a hook killed mid-walk writes nothing — so a
+# synchronous first run on a slow link would never establish an index at all.
+# With no TSV yet the briefing stays quiet and the next session gets it. When an
+# index exists, brief from ONE consistent snapshot of the current TSV taken up
+# front — the age line discloses staleness — so a mid-briefing index replacement
+# can't mix counts from two index versions. The refresh is fully detached
+# (</dev/null + both fds redirected) so the hook's stdout closes and Claude Code
+# doesn't wait on the child.
 if [ ! -f "$TSV" ]; then
-  "$HOME/.claude/hooks/linear-index-refresh.sh" >/dev/null 2>&1
-  [ -f "$TSV" ] || exit 0   # no index yet (no key / first run offline): stay quiet
+  ( "$HOME/.claude/hooks/linear-index-refresh.sh" </dev/null >/dev/null 2>&1 & )
+  exit 0   # no index yet (first run / no key / offline): stay quiet this session
 fi
 
 snapshot=$(cat "$TSV" 2>/dev/null)
@@ -42,8 +44,12 @@ mtime=$(stat -f %m "$TSV" 2>/dev/null || stat -c %Y "$TSV" 2>/dev/null || echo "
 
 ( "$HOME/.claude/hooks/linear-index-refresh.sh" </dev/null >/dev/null 2>&1 & )
 
-count=$(printf '%s\n' "$snapshot" | grep -c '' 2>/dev/null || echo 0)
-in_prog=$(printf '%s\n' "$snapshot" | grep -c $'\tIn Progress\t' 2>/dev/null || echo 0)
+if [ -n "$snapshot" ]; then
+  count=$(printf '%s\n' "$snapshot" | grep -c '' 2>/dev/null || echo 0)
+  in_prog=$(printf '%s\n' "$snapshot" | grep -c $'\tIn Progress\t' 2>/dev/null || echo 0)
+else
+  count=0; in_prog=0
+fi
 
 # index age (hours)
 age_h=$(( (now - mtime) / 3600 ))
