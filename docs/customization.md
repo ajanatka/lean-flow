@@ -7,7 +7,9 @@ Lean Flow ships with one concrete integration (Linear) and a handful of generici
 The Linear pieces are entirely opt-in — the plugin and core harness work with zero tracker integration. If you use Linear:
 
 1. `./harness/install.sh --with-linear` copies the optional hooks (`linear-session-briefing.sh`, `linear-index-refresh.sh`, `linear-commit-nudge.sh`, `linear-list-issues-gate.sh`) into `~/.claude/hooks/`.
-2. Wire them into `~/.claude/settings.json` — see the snippet in `docs/hooks.md`.
+2. Wire them into `~/.claude/settings.json` — see the snippet in `docs/hooks.md`. The
+   briefing hook is the only thing that triggers the index refresh, so if it is not
+   registered under `SessionStart` the index silently stops updating.
 3. Create `~/.claude/lean-flow.env`:
    ```bash
    LF_LINEAR_TEAM_KEY=ENG

@@ -2,8 +2,10 @@
 # PreToolUse gate on Linear list_issues: enforce index-first dedup.
 # Policy (docs/customization.md): grep the local index
 # ~/.claude/state/linear-index/<team-key-lowercase>-open.tsv — do NOT page
-# list_issues JSON into context. The index caps at 250 newest-updated open
-# issues, so a genuine index miss is a legitimate reason to escalate.
+# list_issues JSON into context. The index holds every open issue (all pages,
+# refreshed at session start when older than 4h), so a miss on a fresh index
+# almost certainly means the issue does not exist; escalate for fields the TSV
+# lacks, a suspected stale index, or when the answer is load-bearing.
 # Mechanism: the FIRST list_issues call in a session is denied with
 # instructions to grep the TSV; retrying (after the grep / on a real miss)
 # is allowed. One deny per session — not a hard wall.
@@ -31,7 +33,10 @@ marker="$DIR/.list-issues-ack-$session_id"
 if [ -f "$marker" ]; then
   exit 0   # already acknowledged this session — allow escalation
 fi
+if [ ! -s "$DIR/${TEAM_SLUG}-open.tsv" ]; then
+  exit 0   # no index yet (first session on a machine / no key): nothing to grep, do not block
+fi
 
 touch "$marker"
-echo "BLOCKED (once per session): grep ~/.claude/state/linear-index/${TEAM_SLUG}-open.tsv first — that is the token-cheap dedup path (see docs/customization.md). If the index genuinely misses (it caps at 250 newest-updated open issues) or you need fields the TSV lacks, call list_issues again and it will be allowed." >&2
+echo "BLOCKED (once per session): grep ~/.claude/state/linear-index/${TEAM_SLUG}-open.tsv first — that is the token-cheap dedup path (see docs/customization.md). If the index genuinely misses (it holds every open issue but only identifier/state/title/project/labels, refreshed at session start when older than 4h) or you need fields the TSV lacks, call list_issues again and it will be allowed." >&2
 exit 2

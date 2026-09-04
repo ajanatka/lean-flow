@@ -61,7 +61,7 @@ maintains plan checkbox state; it is not part of the default wiring in
 | Hook | Event | Behavior |
 |---|---|---|
 | `linear-session-briefing.sh` | `SessionStart` | Refresh-if-stale the local issue index, then emit a compact briefing (open-issue counts, branch-matched refs) — the Linear analogue of `session-git-guard.sh`. Never blocks. |
-| `linear-index-refresh.sh` | (called by the briefing hook, or standalone) | Refreshes a compact local TSV index of open issues (`~/.claude/state/linear-index/<team-key-lowercase>-open.tsv`) so sessions can `grep` to dedup instead of paging API JSON into context. Refresh-if-stale; any error exits 0. |
+| `linear-index-refresh.sh` | (called by the briefing hook, or standalone) | Refreshes a compact local TSV index of **every** open issue (`~/.claude/state/linear-index/<team-key-lowercase>-open.tsv`), walking all 250-node pages, so sessions can `grep` to dedup instead of paging API JSON into context. Refresh-if-stale; the index is replaced only when a whole walk succeeds; any error exits 0. |
 | `linear-commit-nudge.sh` | `PreToolUse` (Bash) | Soft, non-blocking reminder when a commit or PR-create carries no `$LF_LINEAR_TEAM_KEY-###` reference. Silent when a ref is already present. Silence a deliberate trivial commit with `CLAUDE_NO_LINEAR=1`. |
 | `linear-list-issues-gate.sh` | `PreToolUse` (on the tracker's `list_issues` tool) | Denies the first `list_issues` call per session with instructions to grep the local TSV index first; the retry is allowed. Enforces index-first dedup instead of paging full JSON into context. |
 | `prod-safety-guard.sh` | `PreToolUse` (Bash) | **Draft, not installed by default.** A deny-list template for production-safety incidents (e.g. a database push without an explicit `--local`/dry-run flag). Adapt the platform-specific rules to your own deploy stack, or delete the ones that don't apply. |
@@ -72,7 +72,8 @@ Wiring snippet for the optional Linear hooks (add alongside the core blocks abov
 {
   "hooks": {
     "SessionStart": [
-      { "matcher": "startup", "hooks": [{ "type": "command", "command": "~/.claude/hooks/linear-session-briefing.sh", "timeout": 10 }] }
+      { "matcher": "startup", "hooks": [{ "type": "command", "command": "~/.claude/hooks/linear-session-briefing.sh", "timeout": 12 }] },
+      { "matcher": "resume",  "hooks": [{ "type": "command", "command": "~/.claude/hooks/linear-session-briefing.sh", "timeout": 12 }] }
     ],
     "PreToolUse": [
       { "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/.claude/hooks/linear-commit-nudge.sh", "timeout": 5 }] },

@@ -28,8 +28,9 @@ Acceptance criteria · Rollout/verification plan · Open questions · Links
 ## Protocol
 1. **Dedup first, index-first**: search the configured Lean Flow state root's
    `linear-index/<lowercase-team-key>-open.tsv` for candidate issues before
-   creating anything. Escalate to a targeted issue-list query ONLY on an
-   index miss (the index caps at 250 newest-updated open issues).
+   creating anything. The index holds every open issue (refreshed at session
+   start when older than 4h), so escalate to ONE targeted issue-list query only
+   on a miss that is about to become a create, or when the TSV is missing.
 2. **Existing issue wins**: if one fits, update it (human-readable title,
    purpose, enough context to resume) instead of creating. If related
    candidates exist, DO NOT auto-merge — report them back to the orchestrator
