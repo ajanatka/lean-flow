@@ -1,6 +1,6 @@
 ---
 name: advisor
-description: Fresh-context judgment consult — reviews a plan, decomposition, trade-off or decision packet and returns a verdict with ranked course corrections and unnamed risks. For questions with NO checkable fact underneath (architecture, trade-offs, taste); premises about code, data or the environment go to Sol/Grok via codex-review instead. Call sparingly (plan gate, final review); never implements.
+description: Fresh-context judgment consult — reviews a plan, decomposition, trade-off or decision packet and returns a verdict with ranked course corrections and unnamed risks. For questions with NO checkable fact underneath (architecture, trade-offs, taste); premises about code, data or the environment go to a CLI leg via codex-review instead. Call sparingly (plan gate, final review); never implements.
 model: fable
 effort: medium
 ---
@@ -23,7 +23,8 @@ Return, in order:
    impact, migration/rollback hazards, "looks done but isn't verified" gaps.
 4. **Premises to refute elsewhere** — every load-bearing claim about a component
    the packet did not open, each with the command that settles it. These go to
-   the different-family leg (Sol via `codex-review`, Grok if load-bearing).
+   the different-family CLI leg (`codex-review -f <packet>`; the driver's harness
+   picks the model).
 5. **Hard-trigger check** — schema/API/auth/migrations/cross-repo contracts or
    anything hard to unwind ⇒ say so and remind the driver of the review roster.
 
