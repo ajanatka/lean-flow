@@ -1,0 +1,36 @@
+name: org-content-tripwire
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  scan:
+    name: org-content-tripwire
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for org-specific content
+        run: |
+          set +e
+          patterns=$(grep -vE '^[[:space:]]*(#|$)' .github/hano-denylist.txt)
+          matches=$(printf '%s\n' "$patterns" | grep -rinE --binary-files=without-match \
+            -f - . \
+            --exclude-dir=.git \
+            --exclude=hano-tripwire.yml \
+            --exclude=hano-denylist.txt)
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "$matches"
+            echo ""
+            echo "Org-specific content detected — this belongs in the private agents repo, not public lean-flow"
+            exit 1
+          fi
+
+          echo "No org-specific content detected."
